@@ -39,28 +39,30 @@ class ExamsScreen extends ConsumerWidget {
                     onTap: () => showExamSheet(context, existing: e),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
-                        Container(
-                          width: 48, height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.event, color: AppColors.warning),
-                        ),
-                        Gap.m,
+                        SizedBox(width: 32, height: 32, child: Checkbox(
+                            value: e.done, activeColor: AppColors.income,
+                            onChanged: (_) => repo.saveExam(e.copyWith(done: !e.done)))),
+                        const SizedBox(width: 6),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          if (st != null)
+                            Text(st.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                           Text('${e.title}${e.subject.isNotEmpty ? ' · ${e.subject}' : ''}',
-                              style: const TextStyle(fontWeight: FontWeight.w700)),
-                          Text([if (st != null) st.name, e.examType,
-                                '${fullDate(e.date)} · ${TimeOfDay.fromDateTime(e.date).format(context)}']
-                              .where((x) => x.isNotEmpty).join(' · '),
-                              style: TextStyle(color: Theme.of(context).hintColor, fontSize: 13)),
+                              style: TextStyle(
+                                  fontWeight: st != null ? FontWeight.w500 : FontWeight.w700,
+                                  fontSize: st != null ? 13 : 15,
+                                  color: st != null ? Theme.of(context).hintColor : null)),
                         ])),
                         Text(days <= 0 ? 'Today' : 'in $days d',
                             style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold)),
                       ]),
+                      const SizedBox(height: 6),
+                      Text([
+                        if (e.examType.isNotEmpty) e.examType,
+                        '${fullDate(e.date)} · ${TimeOfDay.fromDateTime(e.date).format(context)}',
+                        if (e.durationMin > 0) '${e.durationMin} min',
+                      ].join(' · '), style: TextStyle(color: Theme.of(context).hintColor, fontSize: 13)),
                       if (e.syllabus.isNotEmpty) ...[
-                        Gap.s,
+                        const SizedBox(height: 2),
                         Text('Syllabus: ${e.syllabus}',
                             style: TextStyle(color: Theme.of(context).hintColor, fontSize: 13)),
                       ],
@@ -119,6 +121,7 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
   DateTime _date = DateTime.now().add(const Duration(days: 7));
   TimeOfDay _time = const TimeOfDay(hour: 10, minute: 0);
   bool _questionReady = false;
+  int _duration = 0;
 
   @override
   void initState() {
@@ -134,6 +137,7 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
       _date = e.date;
       _time = TimeOfDay(hour: e.date.hour, minute: e.date.minute);
       _questionReady = e.questionReady;
+      _duration = e.durationMin;
     } else {
       _studentId = widget.presetStudentId;
     }
@@ -228,6 +232,21 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
         ]),
         TextField(controller: _syllabus, maxLines: 2,
             decoration: const InputDecoration(labelText: 'Syllabus')),
+        Gap.s,
+        DropdownButtonFormField<int>(
+          initialValue: _duration,
+          decoration: const InputDecoration(labelText: 'Exam duration'),
+          items: const [
+            DropdownMenuItem(value: 0, child: Text('Not set')),
+            DropdownMenuItem(value: 30, child: Text('30 min')),
+            DropdownMenuItem(value: 45, child: Text('45 min')),
+            DropdownMenuItem(value: 60, child: Text('1 hour')),
+            DropdownMenuItem(value: 90, child: Text('1.5 hour')),
+            DropdownMenuItem(value: 120, child: Text('2 hour')),
+            DropdownMenuItem(value: 180, child: Text('3 hour')),
+          ],
+          onChanged: (v) => setState(() => _duration = v ?? 0),
+        ),
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
           value: _questionReady,
@@ -245,6 +264,7 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
               examType: _type, studentId: _studentId ?? '', date: dt,
               subject: _subject ?? '',
               syllabus: _syllabus.text.trim(), questionReady: _questionReady,
+              durationMin: _duration, done: widget.existing?.done ?? false,
             ));
             if (context.mounted) Navigator.pop(context);
           },

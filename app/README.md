@@ -1,6 +1,6 @@
-# Mentora — Flutter App (Phase 1 MVP)
+# Life Tracker Pro — Flutter App (Phase 1 MVP)
 
-Local-first implementation of the Mentora spec (see `../docs/`). Runs fully offline; no backend required.
+Local-first implementation of the Life Tracker Pro spec (see `../docs/`). Runs fully offline; no backend required.
 
 ## Stack
 - **Flutter** · **Riverpod** (state) · **GoRouter** (navigation)

@@ -56,10 +56,15 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       appBar: AppBar(
         title: const Text('Tuition'),
         actions: [
-          IconButton(icon: const Icon(Icons.payments_outlined), tooltip: 'Payments',
-              onPressed: () => context.push('/students/payments')),
-          IconButton(icon: const Icon(Icons.event_note), tooltip: 'Exams',
-              onPressed: () => context.push('/students/exams')),
+          TextButton.icon(
+              onPressed: () => context.push('/students/payments'),
+              icon: const Icon(Icons.payments_outlined, size: 18),
+              label: const Text('Pay')),
+          TextButton.icon(
+              onPressed: () => context.push('/students/exams'),
+              icon: const Icon(Icons.event_note, size: 18),
+              label: const Text('Exams')),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -154,13 +159,58 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   }
 }
 
-class StudentDetailScreen extends ConsumerWidget {
+class StudentDetailScreen extends ConsumerStatefulWidget {
   const StudentDetailScreen({super.key, required this.id});
   final String id;
+  @override
+  ConsumerState<StudentDetailScreen> createState() => _StudentDetailScreenState();
+}
+
+class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
+  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  Widget _examCard(Repo repo, Exam e, {bool taken = false}) {
+    final days = e.date.difference(DateTime.now()).inDays;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: PadCard(
+        tint: taken ? AppColors.income : null,
+        onTap: () => showExamSheet(context, existing: e),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            SizedBox(width: 30, height: 30, child: Checkbox(
+                value: e.done, activeColor: AppColors.income,
+                onChanged: (_) => repo.saveExam(e.copyWith(done: !e.done)))),
+            const SizedBox(width: 8),
+            Expanded(child: Text('${e.title}${e.subject.isNotEmpty ? ' · ${e.subject}' : ''}',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15,
+                    decoration: taken ? TextDecoration.lineThrough : null))),
+            if (!taken) Text(days <= 0 ? 'Today' : 'in $days d',
+                style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold)),
+          ]),
+          Padding(
+            padding: const EdgeInsets.only(left: 38, top: 2),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text([
+                if (e.examType.isNotEmpty) e.examType,
+                '${fullDate(e.date)} · ${TimeOfDay.fromDateTime(e.date).format(context)}',
+                if (e.durationMin > 0) '${e.durationMin} min',
+                e.questionReady ? 'Q ready' : 'Q pending',
+              ].join(' · '), style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+              if (e.syllabus.isNotEmpty)
+                Text('Syllabus: ${e.syllabus}',
+                    style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
+    final id = widget.id;
     return Scaffold(
       body: SafeArea(
         child: AnimatedBuilder(
@@ -174,6 +224,12 @@ class StudentDetailScreen extends ConsumerWidget {
             final last = repo.lastLog(id);
             final exams = repo.examsFor(id);
             final taughtKeys = logs.map((l) => dateKey(l.date)).toSet();
+            final monthLogs = logs
+                .where((l) => l.date.year == _month.year && l.date.month == _month.month)
+                .toList();
+            final monthExams = exams
+                .where((e) => e.date.year == _month.year && e.date.month == _month.month)
+                .toList();
             final m = monthKey(DateTime.now());
             final pay = repo.paymentFor(id, m);
             final paid = pay?.status == 'paid';
@@ -215,12 +271,18 @@ class StudentDetailScreen extends ConsumerWidget {
                         const Icon(Icons.event_repeat, size: 16), const SizedBox(width: 4),
                         Text('${s.classesPerMonth}/month')],
                     ]),
+                    if (s.days.isNotEmpty) ...[Gap.s, Row(children: [
+                      const Icon(Icons.calendar_view_week, size: 16, color: AppColors.savings),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text('Days: ${weekdayNames.where((d) => s.days.contains(d)).join(', ')}',
+                          style: const TextStyle(fontWeight: FontWeight.w600))),
+                    ])],
                     if (s.guardianPhone.isNotEmpty) ...[Gap.s, _PhoneRow(label: 'Guardian', phone: s.guardianPhone)],
                     if (s.phone.isNotEmpty) ...[Gap.s, _PhoneRow(label: 'Student', phone: s.phone)],
                     for (final p in s.extraPhones) ...[Gap.s, _PhoneRow(label: 'Other', phone: p)],
                     Gap.m,
                     Wrap(spacing: 8, runSpacing: 6, children: [
-                      InfoChip(Icons.calendar_month, 'This month: ${repo.classesThisMonth(id)}', color: AppColors.income),
+                      InfoChip(Icons.calendar_month, '${monthLogs.length} in ${monthLabel(_month)}', color: AppColors.income),
                       InfoChip(Icons.menu_book, 'Total: ${logs.length} classes', color: AppColors.primary),
                     ]),
                   ])),
@@ -259,6 +321,8 @@ class StudentDetailScreen extends ConsumerWidget {
                   SectionTitle('Attendance Calendar', icon: Icons.event_available, color: AppColors.income),
                   _TaughtCalendar(
                     taughtKeys: taughtKeys,
+                    month: _month,
+                    onMonthChanged: (mo) => setState(() => _month = mo),
                     onTapDay: (day) {
                       final match = logs.where((l) => dateKey(l.date) == dateKey(day)).toList();
                       if (match.isNotEmpty) {
@@ -270,7 +334,7 @@ class StudentDetailScreen extends ConsumerWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 4, left: 4),
-                    child: Text('Tap a day to add or edit that class',
+                    child: Text('Tap a day to add/edit · use ‹ › to change month (logs & exams follow)',
                         style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
                   ),
                   Gap.l,
@@ -278,42 +342,27 @@ class StudentDetailScreen extends ConsumerWidget {
                       trailing: TextButton.icon(
                           onPressed: () => showExamSheet(context, studentId: id),
                           icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
-                  if (exams.isEmpty) const PadCard(child: Text('No exams for this student.'))
-                  else ...exams.map((e) {
-                        final days = e.date.difference(DateTime.now()).inDays;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: PadCard(
-                            onTap: () => showExamSheet(context, existing: e),
-                            child: Row(children: [
-                              Icon(e.questionReady ? Icons.check_circle : Icons.event,
-                                  color: e.questionReady ? AppColors.income : AppColors.warning),
-                              Gap.m,
-                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text('${e.title}${e.subject.isNotEmpty ? ' · ${e.subject}' : ''}',
-                                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                                Text([e.examType, '${fullDate(e.date)} · ${TimeOfDay.fromDateTime(e.date).format(context)}',
-                                      e.questionReady ? 'Q ready' : 'Q pending']
-                                    .where((x) => x.isNotEmpty).join(' · '),
-                                    style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
-                              ])),
-                              Text(days <= 0 ? 'Today' : 'in $days d',
-                                  style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold)),
-                            ]),
-                          ),
-                        );
-                      }),
+                  if (monthExams.where((e) => !e.done).isEmpty)
+                    const PadCard(child: Text('No upcoming exams this month.'))
+                  else
+                    ...monthExams.where((e) => !e.done).map((e) => _examCard(repo, e)),
+                  if (monthExams.any((e) => e.done)) ...[
+                    Gap.l,
+                    SectionTitle('Taken exams', icon: Icons.history, color: AppColors.income),
+                    ...monthExams.where((e) => e.done).map((e) => _examCard(repo, e, taken: true)),
+                  ],
                   Gap.l,
-                  SectionTitle('Class Logs (${logs.length})'),
-                  if (logs.isEmpty) const PadCard(child: Text('No logs yet.'))
-                  else ...logs.map((l) => Padding(
+                  SectionTitle('Class Logs (${monthLogs.length})'),
+                  if (monthLogs.isEmpty) const PadCard(child: Text('No logs this month.'))
+                  else ...monthLogs.map((l) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: PadCard(
                           onTap: () => context.push('/class-log', extra: l),
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Row(children: [
                               Expanded(child: Text(
-                                  '${fullDate(l.date)} · ${TimeOfDay.fromDateTime(l.date).format(context)}',
+                                  '${fullDate(l.date)}${l.subject.isNotEmpty ? ' · ${l.subject}' : ''} · ${TimeOfDay.fromDateTime(l.date).format(context)}',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontWeight: FontWeight.w600))),
                               Text('${l.performance}/10', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                               const SizedBox(width: 6),
@@ -372,6 +421,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   String _photo = '';
   TimeOfDay _defaultTime = const TimeOfDay(hour: 16, minute: 0);
   final _subjects = <String>{};
+  final _days = <String>{};
   List<String> _classList = [];
   List<String> _subjectOptions = [];
 
@@ -396,6 +446,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
         _perMonth = s.classesPerMonth == 0 ? 8 : s.classesPerMonth;
         _defaultTime = TimeOfDay(hour: s.defaultTimeMinutes ~/ 60, minute: s.defaultTimeMinutes % 60);
         _colorValue = s.colorValue;
+        _days.addAll(s.days);
         if (s.grade.isNotEmpty) {
           if (!_classList.contains(s.grade)) _classList.insert(_classList.length - 1, s.grade);
           _grade = s.grade;
@@ -426,6 +477,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       colorValue: _colorValue,
       photo: _photo,
       subjects: _subjects.toList(),
+      days: weekdayNames.where((d) => _days.contains(d)).toList(),
       weakSubjects: const [],
       extraPhones: _extraPhones.map((c) => c.text.trim()).where((x) => x.isNotEmpty).toList(),
       guardianName: _guardian.text.trim(),
@@ -496,6 +548,15 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
               if (t != null) setState(() => _defaultTime = t);
             },
           ),
+          Gap.m,
+          const Align(alignment: Alignment.centerLeft,
+              child: Text('Class days', style: TextStyle(fontWeight: FontWeight.w600))),
+          Gap.s,
+          Wrap(spacing: 8, runSpacing: 8, children: weekdayNames.map((d) => FilterChip(
+                label: Text(d),
+                selected: _days.contains(d),
+                onSelected: (v) => setState(() => v ? _days.add(d) : _days.remove(d)),
+              )).toList()),
           Gap.m,
           const Text('Card colour', style: TextStyle(fontWeight: FontWeight.w600)),
           Gap.s,
@@ -617,6 +678,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
   DateTime _date = DateTime.now();
   TimeOfDay _time = TimeOfDay.now();
   final _logSubjects = <String>{};
+  final _hwTypes = <String>{};
   final _topics = TextEditingController();
   final _homework = TextEditingController();
   final _nextPlan = TextEditingController();
@@ -659,7 +721,8 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
       id: widget.existing?.id ?? newId(),
       studentId: _studentId!, date: dt,
       subject: _logSubjects.join(', '),
-      topics: _topics.text.trim(), homework: _homework.text.trim(),
+      topics: _topics.text.trim(),
+      homework: [..._hwTypes, if (_homework.text.trim().isNotEmpty) _homework.text.trim()].join(', '),
       nextPlan: _nextPlan.text.trim(), learned: _learned.text.trim(),
       notDone: _notDone.text.trim(), remarks: _remarks.text.trim(),
       performance: _perf.round(),
@@ -724,10 +787,10 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 6, children: [
             for (final h in const ['MCQ', 'CQ', 'Exercise', 'Page', 'Practice', 'Memorize', 'Worksheet'])
-              ActionChip(
-                avatar: const Icon(Icons.add, size: 15),
+              FilterChip(
                 label: Text(h),
-                onPressed: () => _addHw(h)),
+                selected: _hwTypes.contains(h),
+                onSelected: (v) => setState(() => v ? _hwTypes.add(h) : _hwTypes.remove(h))),
           ]),
           const SizedBox(height: 6),
           _field(_homework, 'Homework details (e.g. page 29-48)', lines: 2),
@@ -746,12 +809,6 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
     );
   }
 
-  void _addHw(String h) {
-    final t = _homework.text.trim();
-    _homework.text = t.isEmpty ? h : '$t, $h';
-    _homework.selection = TextSelection.fromPosition(TextPosition(offset: _homework.text.length));
-  }
-
   Widget _field(TextEditingController c, String label, {int lines = 1}) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextField(controller: c, maxLines: lines,
@@ -760,43 +817,31 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
 }
 
 /// Month calendar that highlights days a class was logged (green).
-class _TaughtCalendar extends StatefulWidget {
-  const _TaughtCalendar({required this.taughtKeys, this.onTapDay});
+class _TaughtCalendar extends StatelessWidget {
+  const _TaughtCalendar({required this.taughtKeys, required this.month, this.onMonthChanged, this.onTapDay});
   final Set<String> taughtKeys;
+  final DateTime month;
+  final void Function(DateTime)? onMonthChanged;
   final void Function(DateTime)? onTapDay;
-  @override
-  State<_TaughtCalendar> createState() => _TaughtCalendarState();
-}
-
-class _TaughtCalendarState extends State<_TaughtCalendar> {
-  late DateTime _month;
-
-  @override
-  void initState() {
-    super.initState();
-    final n = DateTime.now();
-    _month = DateTime(n.year, n.month);
-  }
 
   @override
   Widget build(BuildContext context) {
-    final first = DateTime(_month.year, _month.month, 1);
-    final daysInMonth = DateTime(_month.year, _month.month + 1, 0).day;
+    final first = DateTime(month.year, month.month, 1);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final offset = first.weekday - 1; // Monday = 0
     final todayKey = dateKey(DateTime.now());
-    final monthCount =
-        widget.taughtKeys.where((k) => k.startsWith(monthKey(_month))).length;
+    final monthCount = taughtKeys.where((k) => k.startsWith(monthKey(month))).length;
 
     final cells = <Widget>[
       for (var i = 0; i < offset; i++) const SizedBox(),
     ];
     for (var d = 1; d <= daysInMonth; d++) {
-      final date = DateTime(_month.year, _month.month, d);
+      final date = DateTime(month.year, month.month, d);
       final key = dateKey(date);
-      final taught = widget.taughtKeys.contains(key);
+      final taught = taughtKeys.contains(key);
       final isToday = key == todayKey;
       cells.add(GestureDetector(
-        onTap: () => widget.onTapDay?.call(date),
+        onTap: () => onTapDay?.call(date),
         behavior: HitTestBehavior.opaque,
         child: Container(
           margin: const EdgeInsets.all(3),
@@ -819,12 +864,12 @@ class _TaughtCalendarState extends State<_TaughtCalendar> {
       child: Column(children: [
         Row(children: [
           IconButton(
-              onPressed: () => setState(() => _month = DateTime(_month.year, _month.month - 1)),
+              onPressed: () => onMonthChanged?.call(DateTime(month.year, month.month - 1)),
               icon: const Icon(Icons.chevron_left)),
-          Expanded(child: Text(monthLabel(_month), textAlign: TextAlign.center,
+          Expanded(child: Text(monthLabel(month), textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.w700))),
           IconButton(
-              onPressed: () => setState(() => _month = DateTime(_month.year, _month.month + 1)),
+              onPressed: () => onMonthChanged?.call(DateTime(month.year, month.month + 1)),
               icon: const Icon(Icons.chevron_right)),
         ]),
         Row(children: weekdayNames
@@ -843,7 +888,7 @@ class _TaughtCalendarState extends State<_TaughtCalendar> {
           Container(width: 12, height: 12,
               decoration: const BoxDecoration(color: AppColors.income, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          Text('Taught $monthCount ${monthCount == 1 ? 'day' : 'days'} this month',
+          Text('Taught $monthCount ${monthCount == 1 ? 'day' : 'days'} in ${monthLabel(month)}',
               style: const TextStyle(fontWeight: FontWeight.w600)),
         ]),
       ]),

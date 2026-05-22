@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/backup.dart';
 import '../../core/providers.dart';
+import '../../core/updater.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../finance/finance_screen.dart' show hashPin;
@@ -81,9 +82,19 @@ class SettingsScreen extends ConsumerWidget {
             ])),
             Gap.l,
             const SectionTitle('General'),
-            const Card(child: Column(children: [
-              ListTile(leading: Icon(Icons.language), title: Text('Language'), subtitle: Text('English (বাংলা coming soon)')),
-              ListTile(leading: Icon(Icons.info_outline), title: Text('Life Tracker Pro'), subtitle: Text('Version 1.0.0')),
+            Card(child: Column(children: [
+              ListTile(
+                leading: const Icon(Icons.system_update, color: AppColors.primary),
+                title: const Text('Check for updates'),
+                subtitle: const Text('Download the latest version from GitHub'),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Checking for updates…')));
+                  runUpdateCheck(context);
+                },
+              ),
+              const ListTile(leading: Icon(Icons.language), title: Text('Language'), subtitle: Text('English (বাংলা coming soon)')),
+              const ListTile(leading: Icon(Icons.info_outline), title: Text('Life Tracker Pro'), subtitle: Text('Version 1.0.0')),
             ])),
           ],
         ),

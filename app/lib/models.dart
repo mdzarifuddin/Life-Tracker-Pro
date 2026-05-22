@@ -1,4 +1,4 @@
-// Mentora data models — plain classes with Map (de)serialization for Hive.
+// Life Tracker Pro data models — plain classes with Map (de)serialization for Hive.
 // See docs/DATABASE.md for the field reference.
 
 double _d(dynamic v) => (v == null) ? 0.0 : (v as num).toDouble();
@@ -13,7 +13,7 @@ class Student {
   final int classesPerMonth;
   final int defaultTimeMinutes;
   final int colorValue; // 0 = auto
-  final List<String> subjects, weakSubjects, extraPhones;
+  final List<String> subjects, weakSubjects, extraPhones, days;
   final String guardianName, guardianPhone, photo;
 
   Student({
@@ -32,6 +32,7 @@ class Student {
     this.subjects = const [],
     this.weakSubjects = const [],
     this.extraPhones = const [],
+    this.days = const [],
     this.guardianName = '',
     this.guardianPhone = '',
   });
@@ -42,6 +43,7 @@ class Student {
         'monthlyFee': monthlyFee, 'classesPerMonth': classesPerMonth,
         'defaultTimeMinutes': defaultTimeMinutes, 'colorValue': colorValue,
         'subjects': subjects, 'weakSubjects': weakSubjects, 'extraPhones': extraPhones,
+        'days': days,
         'guardianName': guardianName, 'guardianPhone': guardianPhone, 'photo': photo,
       };
 
@@ -53,7 +55,7 @@ class Student {
         defaultTimeMinutes: m['defaultTimeMinutes'] == null ? 960 : _i(m['defaultTimeMinutes']),
         colorValue: _i(m['colorValue']),
         subjects: _ls(m['subjects']), weakSubjects: _ls(m['weakSubjects']),
-        extraPhones: _ls(m['extraPhones']),
+        extraPhones: _ls(m['extraPhones']), days: _ls(m['days']),
         guardianName: _s(m['guardianName']), guardianPhone: _s(m['guardianPhone']),
         photo: _s(m['photo']),
       );
@@ -207,7 +209,8 @@ class Category {
 
 class Exam {
   final String id, studentId, title, subject, examType, syllabus;
-  final bool questionReady;
+  final bool questionReady, done;
+  final int durationMin;
   final DateTime date;
   Exam({
     required this.id,
@@ -217,20 +220,28 @@ class Exam {
     this.examType = '',
     this.syllabus = '',
     this.questionReady = false,
+    this.done = false,
+    this.durationMin = 0,
     required this.date,
   });
 
   Map<String, dynamic> toMap() => {
         'id': id, 'studentId': studentId, 'title': title, 'subject': subject,
         'examType': examType, 'syllabus': syllabus, 'questionReady': questionReady,
-        'date': date.toIso8601String(),
+        'done': done, 'durationMin': durationMin, 'date': date.toIso8601String(),
       };
   factory Exam.fromMap(Map m) => Exam(
         id: _s(m['id']), studentId: _s(m['studentId']), title: _s(m['title']),
         subject: _s(m['subject']), examType: _s(m['examType']),
         syllabus: _s(m['syllabus']), questionReady: m['questionReady'] == true,
+        done: m['done'] == true, durationMin: _i(m['durationMin']),
         date: DateTime.tryParse(_s(m['date'])) ?? DateTime.now(),
       );
+
+  Exam copyWith({bool? done}) => Exam(
+        id: id, studentId: studentId, title: title, subject: subject,
+        examType: examType, syllabus: syllabus, questionReady: questionReady,
+        done: done ?? this.done, durationMin: durationMin, date: date);
 }
 
 class JobTask {

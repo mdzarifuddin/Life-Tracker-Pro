@@ -1,4 +1,4 @@
-# 🗄️ Mentora — Database Design
+# 🗄️ Life Tracker Pro — Database Design
 
 Single source-of-truth schema for both the **PostgreSQL backend** and the **Drift (SQLite) local store**. Types are given generically; map to `TEXT/INTEGER/REAL/BOOLEAN` (SQLite) or `uuid/varchar/numeric/timestamptz/boolean` (PostgreSQL).
 

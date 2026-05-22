@@ -6,6 +6,7 @@ import '../../core/data.dart';
 import '../../core/providers.dart';
 import '../../core/quick_add.dart';
 import '../../core/theme.dart';
+import '../../core/updater.dart';
 import '../../core/widgets.dart';
 import '../schedule/schedule_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -16,6 +17,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.read(repoProvider);
+    autoUpdateOnce(context);
     return Scaffold(
       body: SafeArea(
         child: AnimatedBuilder(

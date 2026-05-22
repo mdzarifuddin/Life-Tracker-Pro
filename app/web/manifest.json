@@ -1,6 +1,6 @@
 {
-    "name": "mentora",
-    "short_name": "mentora",
+    "name": "Life Tracker Pro",
+    "short_name": "Life Tracker",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -99,8 +99,8 @@ final _router = GoRouter(
   ],
 );
 
-class MentoraApp extends ConsumerWidget {
-  const MentoraApp({super.key});
+class LifeTrackerApp extends ConsumerWidget {
+  const LifeTrackerApp({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);

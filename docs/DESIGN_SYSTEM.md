@@ -1,4 +1,4 @@
-# 🎨 Mentora — Design System
+# 🎨 Life Tracker Pro — Design System
 
 > **Clean · Fast · Premium · One-hand use · Zero clutter**
 > Inspired by **Monefy** (finance), **Notion** (calm modular layout), **Google Calendar** (scheduling).
@@ -10,7 +10,7 @@ This document defines exact design tokens so the UI can be implemented consisten
 
 ## 1. Brand
 
-- **Name:** Mentora
+- **Name:** Life Tracker Pro
 - **Tagline:** *Manage Tuition, Finance, Study & Family — From One Place*
 - **Personality:** confident, focused, premium, trustworthy. Not playful, not corporate-cold.
 - **Currency:** Bangladeshi Taka — symbol `৳`, format `৳ 27,000` (thousands separator, no decimals for whole amounts).

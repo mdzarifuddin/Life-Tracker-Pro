@@ -1,4 +1,4 @@
-# 📋 Mentora — Product Requirements Document (PRD)
+# 📋 Life Tracker Pro — Product Requirements Document (PRD)
 
 **Version:** 1.0 (build-ready draft)
 **Audience:** Claude Code / implementing engineers
@@ -191,7 +191,7 @@ PDF/Excel/CSV export, monthly financial dashboard.
 Parents view attendance/homework/results; WhatsApp auto-report; monthly PDF report.
 
 ### Phase 3 — Public Launch
-Play Store release as **"Mentora Bangladesh"**; multi-tutor accounts; premium tier (result prediction, QR attendance).
+Play Store release as **"Life Tracker Pro Bangladesh"**; multi-tutor accounts; premium tier (result prediction, QR attendance).
 
 ---
 

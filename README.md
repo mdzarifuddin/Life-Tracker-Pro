@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📚 Mentora
+# 📚 Life Tracker Pro
 
 ### Manage Tuition, Finance, Study & Family — From One Place
 
@@ -16,9 +16,9 @@ A premium, offline-first **personal life-management system** for private tutors,
 
 ---
 
-## ✨ What is Mentora?
+## ✨ What is Life Tracker Pro?
 
-Mentora is **not** just a tuition app — it is a **personal academic, finance & life operating system**. It unifies the four things a working tutor-student juggles every day:
+Life Tracker Pro is **not** just a tuition app — it is a **personal academic, finance & life operating system**. It unifies the four things a working tutor-student juggles every day:
 
 | 🎓 Tutor Management | 💰 Personal Finance | 🚀 Career & Study | 🛒 Family & Home |
 | :--- | :--- | :--- | :--- |
@@ -125,7 +125,7 @@ See **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** for the full color palett
 ## 📁 Repository Structure
 
 ```
-mentora/
+life-tracker-pro/
 ├── app/                        # Flutter application
 │   └── lib/
 │       ├── core/               # theme, router, di, utils, network, db
@@ -207,7 +207,7 @@ flutter run                                                 # pick your device
 | **v1.2 — Reports** | Insights | PDF/Excel/CSV export, monthly financial dashboard, analytics. |
 | **v2.0 — AI** | Intelligence | AI lesson planner, finance insights, voice-note logging, OCR receipt scanner. |
 | **v2.1 — Guardian Portal** | Sharing | Parents view attendance / homework / results; WhatsApp auto-reports. |
-| **v3.0 — Public launch** | Scale | Play Store release as *"Mentora Bangladesh"* for other tutors. |
+| **v3.0 — Public launch** | Scale | Play Store release as *"Life Tracker Pro Bangladesh"* for other tutors. |
 
 Full breakdown in **[docs/PRD.md](docs/PRD.md)**.
 

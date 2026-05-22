@@ -1,4 +1,4 @@
-# 🏗️ Mentora — System & Application Architecture
+# 🏗️ Life Tracker Pro — System & Application Architecture
 
 This document is the engineering blueprint: system topology, Flutter clean architecture, offline-first sync, security model, and the backend contract.
 
@@ -85,7 +85,7 @@ app/lib/
 
 ### 2.4 Navigation — GoRouter
 - Declarative routes; **route guard** redirects to the lock screen before any `finance/vault/*` route if the vault is locked.
-- Deep links: `mentora://student/{id}`, `mentora://class/log?student={id}`.
+- Deep links: `lifetrackerpro://student/{id}`, `lifetrackerpro://class/log?student={id}`.
 
 ---
 

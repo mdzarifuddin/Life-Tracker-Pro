@@ -7,5 +7,5 @@ import 'core/data.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Repo.init();
-  runApp(const ProviderScope(child: MentoraApp()));
+  runApp(const ProviderScope(child: LifeTrackerApp()));
 }

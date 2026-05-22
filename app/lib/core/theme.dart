@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Mentora design tokens — see docs/DESIGN_SYSTEM.md
+/// Life Tracker Pro design tokens — see docs/DESIGN_SYSTEM.md
 class AppColors {
   // Brand
   static const primary = Color(0xFF6366F1);

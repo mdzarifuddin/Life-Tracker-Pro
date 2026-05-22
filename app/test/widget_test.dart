@@ -1,6 +1,6 @@
-// Mentora smoke test.
+// Life Tracker Pro smoke test.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mentora/models.dart';
+import 'package:life_tracker_pro/models.dart';
 
 void main() {
   test('Student serializes round-trip', () {

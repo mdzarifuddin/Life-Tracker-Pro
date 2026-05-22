@@ -163,8 +163,9 @@ class Repo {
 
   List<Exam> get examList =>
       _all(exams, Exam.fromMap)..sort((a, b) => a.date.compareTo(b.date));
-  List<Exam> get upcomingExams =>
-      examList.where((e) => e.date.isAfter(DateTime.now().subtract(const Duration(days: 1)))).toList();
+  List<Exam> get upcomingExams => examList
+      .where((e) => !e.done && e.date.isAfter(DateTime.now().subtract(const Duration(days: 1))))
+      .toList();
 
   List<JobTask> get jobTaskList => _all(jobtasks, JobTask.fromMap);
 

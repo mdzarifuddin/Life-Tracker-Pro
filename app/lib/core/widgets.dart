@@ -124,21 +124,42 @@ class PadCard extends StatelessWidget {
   final EdgeInsets? padding;
   final Color? tint;
   @override
-  Widget build(BuildContext context) => Card(
-        color: tint == null
-            ? null
-            : Color.alphaBlend(tint!.withValues(alpha: 0.20), Theme.of(context).colorScheme.surface),
-        shape: tint == null
-            ? null
-            : RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(22),
-                side: BorderSide(color: tint!.withValues(alpha: 0.55))),
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final base = tint == null
+        ? cs.surface
+        : Color.alphaBlend(tint!.withValues(alpha: 0.18), cs.surface);
+    // subtle diagonal sheen
+    final sheen = Color.alphaBlend(
+        (dark ? Colors.white : (tint ?? cs.primary)).withValues(alpha: dark ? 0.05 : 0.05), base);
+    final borderColor =
+        (tint ?? cs.primary).withValues(alpha: tint == null ? (dark ? 0.14 : 0.12) : 0.5);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+            begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [sheen, base]),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: (tint ?? (dark ? Colors.black : cs.primary))
+                .withValues(alpha: dark ? 0.30 : 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: onTap,
           child: Padding(padding: padding ?? const EdgeInsets.all(16), child: child),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// Small stat card: label + big value.
