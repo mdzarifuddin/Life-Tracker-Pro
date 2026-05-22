@@ -1,0 +1,1253 @@
+তোমার situation অনুযায়ী এটা শুধু একটা "Tuition Management App" না, বরং Personal Academic & Career Operating System হতে পারে।
+
+কারণ তুমি একসাথে:
+
+MSc Thesis শেষ করছ
+Tuition করছ
+Govt Job preparation নিচ্ছ
+Future career track করতে চাও
+
+তাই app টা modular হওয়া উচিত।
+
+Core Vision
+
+TutorOS
+
+একটা AI-assisted Personal Management System
+
+যেখানে তুমি দেখতে পারবে:
+
+আজ কাকে পড়াতে হবে
+গত ক্লাসে কী পড়িয়েছিলে
+পরের ক্লাসে কী পড়াবে
+কার পরীক্ষা কবে
+কার বেতন বাকি
+নিজের Govt Job Study Progress
+Thesis Progress
+Income Report
+High Level Architecture
+Mobile App (Flutter)
+
+        │
+
+        ▼
+
+FastAPI Backend
+
+        │
+
+ ┌──────┼─────────┐
+ │      │         │
+ ▼      ▼         ▼
+
+PostgreSQL   Firebase   Github
+
+(Database)   Notification  Backup
+
+        │
+
+        ▼
+
+AI Assistant Layer
+(Gemini/OpenAI)
+Module 1: Student Management
+
+প্রত্যেক student এর profile থাকবে।
+
+Name
+Class
+School/College
+SSC/HSC Batch
+
+Father Name
+Mother Name
+
+Phone Number
+
+Address
+
+Monthly Fee
+
+Exam Date
+
+Weak Subjects
+
+Example:
+
+Name: Rahim
+Class: HSC 1st Year
+
+Weak:
+- Math
+- Physics
+
+Fee:
+5000/month
+Module 2: Class Logbook
+
+এটাই সবচেয়ে important feature।
+
+প্রতিবার class শেষে 30 second এ update।
+
+Example:
+
+Date:
+20 June 2026
+
+Student:
+Rahim
+
+Topics Covered:
+
+- Differentiation
+- Chain Rule
+
+Homework:
+
+Exercise 3
+Question 1-10
+
+Performance:
+
+7/10
+
+পরের দিন app open করলে দেখাবে
+
+Last Class Summary
+
+Topics:
+Differentiation
+Chain Rule
+
+Homework:
+Exercise 3
+
+আর কিছু মনে রাখতে হবে না।
+
+Module 3: Exam Tracker
+
+Student-wise exam tracking।
+
+SSC Test
+Monthly Exam
+Pre-test
+HSC Model Test
+
+Calendar View
+
+July 12
+
+Rahim Exam
+
+Physics
+
+Notification
+
+Physics exam in 3 days
+Module 4: Tuition Schedule
+
+Google Calendar style.
+
+Saturday
+
+4 PM
+Rahim
+
+6 PM
+Karim
+
+8 PM
+Nusrat
+
+Conflict Detection
+
+যদি
+
+4 PM Rahim
+
+4 PM Hasan
+
+তাহলে warning দিবে।
+
+Module 5: Income & Payment Tracker
+
+সব tuition teacher এর দরকার।
+
+Student
+Monthly Fee
+Paid?
+
+Example
+
+Rahim
+5000
+
+Paid ✔
+Karim
+6000
+
+Due ❌
+
+Monthly Report
+
+Income
+
+January:
+21000
+
+February:
+26000
+Module 6: Govt Job Preparation
+
+তুমি যেহেতু BCS/Bank/Govt Job preparation করছ।
+
+Separate Module
+
+Subjects:
+
+Bangla
+English
+Math
+GK
+ICT
+
+Track
+
+Today's Target
+
+Math:
+50 MCQ
+
+Completed:
+37
+
+Progress Chart
+
+Module 7: MSc Thesis Tracker
+Literature Review
+
+80%
+Methodology
+
+100%
+Writing
+
+45%
+Defense Preparation
+
+20%
+
+Deadline reminder।
+
+Module 8: AI Lesson Planner
+
+Future feature।
+
+তুমি লিখবে
+
+Student:
+HSC Physics
+
+Last Topic:
+Work Energy Power
+
+AI generate করবে
+
+Next Class Plan
+
+1. Power
+2. Efficiency
+3. Numerical
+4. Homework
+Module 9: Voice Note to Log
+
+Class শেষে বলবে:
+
+Today I taught
+Integration chapter 4
+Homework question 1-10
+
+Speech-to-text convert হয়ে logbook এ save হবে।
+
+Module 10: Student Analytics
+
+App automatically calculate করবে
+
+Attendance
+
+92%
+Homework Completion
+
+87%
+Performance Trend
+
+Upward
+Database Design
+students
+id
+name
+class
+phone
+fee
+exam_date
+weak_subjects
+classes
+id
+student_id
+
+date
+
+topic
+
+homework
+
+performance
+schedules
+id
+
+student_id
+
+day
+
+time
+payments
+id
+
+student_id
+
+month
+
+amount
+
+status
+exams
+id
+
+student_id
+
+subject
+
+date
+thesis_tasks
+id
+
+title
+
+status
+
+deadline
+job_prep_tasks
+id
+
+subject
+
+target
+
+completed
+Technology Stack (Industry Grade)
+Mobile
+Flutter
+Backend
+FastAPI
+Database
+PostgreSQL
+Authentication
+Firebase Auth
+Notifications
+Firebase Cloud Messaging
+AI
+Gemini API
+CI/CD
+GitHub Actions
+Deployment
+Docker
+AWS EC2 / Oracle Cloud Free Tier
+Future Premium Features
+Student result prediction
+OCR দিয়ে খাতা scan
+Attendance via QR
+Guardian Portal
+WhatsApp auto report
+Monthly PDF report generation
+AI study planner
+Expense tracking
+Personal finance dashboard
+
+এভাবে বানালে এটা শুধু তোমার নিজের app থাকবে না, ভবিষ্যতে Play Store-এ "TutorOS Bangladesh" নামে publish করে অন্য tuition teacher দেরও ব্যবহার করাতে পারবে। EEE + MSc background থাকার কারণে এটা তোমার জন্য ভালো portfolio projectও হবে, বিশেষ করে যদি FastAPI, Flutter, PostgreSQL, Docker, GitHub Actions ব্যবহার করো।
+
+Atar shate arekta kaj koro..
+Amar monthly income and expense track kora..kon kaj koto cost hoise..koto taka ase..ata secretly thakbe..atao add..
+
+এটা অবশ্যই add করা উচিত। আসলে তোমার app-এর মধ্যে Tutor Management + Personal Finance + Career Management — এই ৩টা একসাথে থাকলে সবচেয়ে useful হবে।
+
+Module 11: Personal Finance Vault (Private)
+
+এটা student বা tuition data থেকে সম্পূর্ণ আলাদা থাকবে।
+
+App-এ দুইটা mode থাকবে:
+
+Public Workspace
+Students
+Classes
+Exams
+Tuition Schedule
+Private Vault
+Income
+Expense
+Savings
+Cash Flow
+Personal Notes
+
+Private Vault PIN/Password দিয়ে lock করা থাকবে।
+
+Income Tracking
+
+প্রত্যেক income source আলাদা থাকবে।
+
+Example:
+
+Date	Source	Amount
+1 Jun	Tuition - Rahim	5000
+3 Jun	Tuition - Karim	6000
+10 Jun	Freelance	12000
+
+মাস শেষে:
+
+Tuition Income:
+25000
+
+Freelancing:
+12000
+
+Other:
+3000
+
+Total:
+40000
+Expense Tracking
+
+যেখানে সব খরচ লিখতে পারবে।
+
+Categories:
+
+Food
+
+Transport
+
+Mobile Recharge
+
+Internet
+
+Books
+
+Govt Job Preparation
+
+Thesis
+
+Family
+
+Medical
+
+Other
+
+Example:
+
+Date	Category	Amount
+3 Jun	Internet	1000
+5 Jun	Books	850
+7 Jun	Transport	400
+Project Cost Tracker
+
+তুমি যেহেতু thesis, project, admission, job exam এসব করো, তাই আলাদা module দরকার।
+
+Example:
+
+MSc Thesis
+Printing:
+1500
+
+Binding:
+600
+
+Transportation:
+800
+
+Total:
+2900
+Govt Job
+Books:
+3500
+
+Exam Fees:
+1200
+
+Travel:
+700
+App Project
+Domain:
+1200
+
+Server:
+3000
+
+API:
+1000
+
+এক ক্লিকে দেখতে পারবে:
+
+Total Cost of Project:
+5200 BDT
+Asset Tracker
+
+তোমার হাতে এখন কত টাকা আছে।
+
+Cash:
+5000
+
+bKash:
+12000
+
+Nagad:
+4000
+
+Bank:
+35000
+
+Total Net Available:
+
+56000 BDT
+Monthly Financial Dashboard
+
+Example:
+
+June 2026
+
+Income:
+45000
+
+Expense:
+16000
+
+Savings:
+29000
+
+Savings Rate:
+64%
+Goal Tracking
+
+তুমি লক্ষ্য সেট করতে পারবে।
+
+Example:
+
+New Laptop
+
+Target:
+80000
+
+Saved:
+32000
+
+Remaining:
+48000
+GRE Exam Fund
+
+Target:
+35000
+
+Saved:
+12000
+
+Progress bar দেখাবে।
+
+Emergency Fund Tracker
+Emergency Fund
+
+Target:
+100000
+
+Current:
+42000
+Secret Security Features
+
+Private Vault-এর জন্য:
+
+PIN Lock
+Fingerprint Login
+Face Unlock (future)
+Encrypted Database
+Hidden Balance Mode
+
+Example:
+
+Available Balance
+
+******
+
+Tap করলে দেখাবে।
+
+Extra Smart Feature
+
+যদি Tuition Fee receive করো:
+
+Rahim Paid 5000
+
+তাহলে automatic:
+
+Income +5000
+
+Finance module-এ add হয়ে যাবে।
+
+Final App Structure
+TutorOS
+
+├── Dashboard
+
+├── Students
+
+├── Class Logbook
+
+├── Schedule
+
+├── Exam Tracker
+
+├── Payment Tracker
+
+├── AI Lesson Planner
+
+├── Govt Job Prep
+
+├── MSc Thesis
+
+├── Finance Vault 🔒
+│
+├── Income
+├── Expense
+├── Savings
+├── Assets
+├── Goals
+└── Project Costs
+
+├── Reports
+
+└── Settings
+
+এই structure অনুযায়ী বানালে তুমি এক app দিয়েই tuition, MSc thesis, govt job preparation, personal finance—সবকিছু manage করতে পারবে। এটা আসলে ব্যক্তিগত Life Management System হয়ে যাবে।
+
+Expense track age thekei kisu likha thakbe..just i select..if not found create one time new  type...monefy er moto professional lagbe...full app professional lagbe.. details architecture er doc banay deo..koyta screen ki ki thakbe.kmn design..all everything..then this doc will be send to calude code to build app.
+
+এখন আমি Claude Code-কে দেওয়ার মতো level-এর Product Requirements Document (PRD) + System Architecture দিচ্ছি।
+
+Project Name
+
+TutorOS
+
+Tagline
+
+Manage Tuition, Finance, Thesis & Career From One Place
+
+Product Goal
+
+Bangladesh-এর private tutor, university student, MSc researcher, job seeker-দের জন্য all-in-one productivity platform।
+
+Target User (Phase 1):
+
+Private Tutor
+University Student
+MSc Student
+Govt Job Aspirant
+Design Philosophy
+
+App দেখতে হবে:
+
+Minimal
+Fast
+Premium
+Monefy Inspired
+Notion Inspired
+Google Calendar Inspired
+
+Keywords:
+
+Clean
+Professional
+One Hand Use
+Fast Entry
+Zero Clutter
+Navigation Structure
+
+Bottom Navigation
+
+Dashboard
+Students
+Schedule
+Finance
+More
+Screen 1: Dashboard
+
+Home Screen
+
+User app open করলে first screen
+
+Top Section
+
+Good Evening Zarif
+
+Today:
+4 Classes
+
+Income This Month:
+৳ 27,000
+
+Pending:
+৳ 8,000
+
+Middle Section
+
+Today's Schedule
+
+4 PM - Rahim
+
+6 PM - Nusrat
+
+8 PM - HSC Batch
+
+Quick Actions
+
+Floating Button
+
++ Add Expense
+
++ Add Income
+
++ Add Student
+
++ Log Class
+
+Bottom Widgets
+
+Upcoming Exams
+
+Govt Job Progress
+
+Thesis Progress
+Screen 2: Students
+
+Search bar
+
+Student List
+
+Card View
+
+Rahim
+
+HSC 2027
+
+Physics + Math
+
+Next Class:
+Tomorrow
+
+Student Profile Screen
+
+Sections
+
+Overview
+
+Class Logs
+
+Homework
+
+Attendance
+
+Payments
+
+Exams
+
+Notes
+Student Data Model
+{
+  "id":"",
+  "name":"",
+  "phone":"",
+  "class":"",
+  "institution":"",
+  "monthly_fee":5000,
+  "subjects":[],
+  "guardian_name":"",
+  "guardian_phone":""
+}
+Screen 3: Class Logbook
+
+MOST IMPORTANT MODULE
+
+After every class
+
+One Click Entry
+
+Class Entry Form
+
+Student
+
+Date
+
+Topics Covered
+
+Homework
+
+Performance
+
+Remarks
+
+Voice Input
+
+Button
+
+🎤
+
+Example
+
+Today taught Integration.
+Homework question 1-10.
+
+Auto save
+
+AI Summary
+
+Automatically Generate
+
+Last Class Summary
+Screen 4: Schedule
+
+Calendar View
+
+Day View
+
+Week View
+
+Month View
+
+Schedule Card
+
+Student
+
+Time
+
+Location
+
+Duration
+
+Reminder
+
+Class in 30 Minutes
+
+Conflict Detection
+
+If same time
+
+Show Red Warning
+
+Screen 5: Finance (Monefy Inspired)
+
+This module should feel exactly like a professional finance app.
+
+Finance Home
+
+Large Circle Chart
+
+Income
+Expense
+Savings
+
+Quick Add Button
+
+Center Floating Action Button
+
+Expense Entry Screen
+
+Predefined Categories
+
+Food
+
+Transport
+
+Internet
+
+Mobile
+
+Books
+
+Tuition Travel
+
+Family
+
+Medical
+
+Shopping
+
+Entertainment
+
+Govt Job
+
+Thesis
+
+Software
+
+Subscriptions
+
+Investment
+
+Other
+
+User Workflow
+
+Example
+
+Tap Expense
+
+Select Category
+
+Food
+
+Enter Amount
+
+200
+
+Save
+
+3 seconds
+
+Done
+
+Custom Category
+
+If category not found
+
++ Create New Category
+
+One time
+
+Then permanently stored
+
+Income Categories
+
+Tuition
+
+Freelancing
+
+Scholarship
+
+Gift
+
+Salary
+
+Business
+
+Other
+Finance Vault (Private)
+
+Completely Separate
+
+Hidden Area
+
+Authentication
+
+PIN
+
+Fingerprint
+
+Face Unlock
+
+Balance Screen
+
+Cash
+
+bKash
+
+Nagad
+
+Bank
+
+Example
+
+Cash:
+5000
+
+bKash:
+12000
+
+Bank:
+35000
+
+Net Worth
+
+Auto Calculate
+
+52,000
+Screen 6: Expense Analytics
+
+Monthly
+
+Yearly
+
+Custom
+
+Charts
+
+Category Wise
+
+Income vs Expense
+
+Savings Trend
+
+Reports
+
+PDF Export
+
+Excel Export
+Screen 7: Tuition Payment Tracker
+
+Student Wise
+
+Status
+
+Paid
+
+Pending
+
+Partial
+
+Auto Integration
+
+If Rahim pays
+
++5000 Income
+
+Automatically added to Finance
+
+Screen 8: Exam Tracker
+
+Student Exams
+
+Examples
+
+SSC
+
+HSC
+
+Monthly Test
+
+Pre-Test
+
+Notifications
+
+Exam in 7 Days
+Screen 9: Govt Job Tracker
+
+Subjects
+
+Bangla
+
+English
+
+Math
+
+GK
+
+ICT
+
+Daily Target
+
+100 MCQ
+
+Progress
+
+72 Completed
+Screen 10: Thesis Tracker
+
+Stages
+
+Literature Review
+
+Methodology
+
+Implementation
+
+Results
+
+Writing
+
+Defense
+
+Progress Bar
+
+Deadline
+
+Notes
+
+Screen 11: Reports
+
+Generate
+
+Monthly Income
+
+Monthly Expense
+
+Student Payment Report
+
+Tuition Earnings
+
+Study Progress
+
+Export Formats
+
+PDF
+
+Excel
+
+CSV
+Screen 12: Settings
+
+Theme
+
+Notifications
+
+Backup
+
+Security
+
+Language
+
+Dark Mode Default
+
+Premium Look
+
+Backend Architecture
+
+Flutter App
+
+      ↓
+
+FastAPI
+
+      ↓
+
+PostgreSQL
+
+      ↓
+
+Redis
+
+      ↓
+
+Firebase
+
+Folder Structure
+
+lib/
+
+core/
+
+features/
+
+dashboard/
+
+students/
+
+schedule/
+
+finance/
+
+payments/
+
+exams/
+
+jobprep/
+
+thesis/
+
+reports/
+
+settings/
+
+Database Tables
+
+users
+
+students
+
+class_logs
+
+schedules
+
+payments
+
+income
+
+expenses
+
+categories
+
+assets
+
+exam_events
+
+job_tasks
+
+thesis_tasks
+
+notifications
+
+settings
+
+Advanced Features (Phase 2)
+
+AI Teacher Assistant
+
+Generate:
+
+Lesson Plan
+Homework
+MCQ
+Exam Suggestions
+AI Finance Insights
+
+Example
+
+You spent 32% more on Food this month.
+OCR Receipt Scanner
+
+Take picture
+
+Expense auto detected
+
+Guardian Portal
+
+Parent can see
+
+Attendance
+
+Homework
+
+Exam Results
+Cloud Sync
+
+GitHub Actions + PostgreSQL Backup
+
+Daily Backup
+
+Versioned Restore
+
+Play Store Ready Requirements
+Flutter Clean Architecture
+Riverpod State Management
+GoRouter Navigation
+FastAPI Backend
+PostgreSQL
+Docker
+CI/CD
+Firebase Analytics
+Crashlytics
+Biometric Authentication
+Offline First (Hive + SQLite Cache)
+
+Claude Code-কে বলবে: "Build TutorOS v1 using Flutter Clean Architecture, Riverpod, FastAPI, PostgreSQL, Docker, Offline-first sync, Monefy-inspired Finance UX, and modular feature-based structure." এটাই production-grade foundation হবে।

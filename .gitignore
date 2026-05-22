@@ -1,0 +1,26 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Flutter / Dart build artifacts (belt-and-suspenders; app/.gitignore also covers these)
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.gradle/
+app/android/.gradle/
+app/android/local.properties
+app/android/app/.cxx/
+app/**/generated_plugin_registrant.*
+
+# Compiled binaries / archives
+*.apk
+*.aab
+*.aar
+*.ipa
+*.zip
+
+# Misc
+*.log
