@@ -22,5 +22,10 @@ app/**/generated_plugin_registrant.*
 *.ipa
 *.zip
 
+# Signing secrets — NEVER commit these
+app/android/key.properties
+app/**/*.jks
+app/**/*.keystore
+
 # Misc
 *.log
