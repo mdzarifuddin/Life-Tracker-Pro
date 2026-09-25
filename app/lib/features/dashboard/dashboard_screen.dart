@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/data.dart';
 import '../../core/providers.dart';
@@ -38,25 +39,57 @@ class DashboardScreen extends ConsumerWidget {
                             color: Theme.of(context).colorScheme.onSurface)),
                     Text(fullDate(DateTime.now()),
                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    ValueListenableBuilder<VersionStatus>(
+                      valueListenable: versionStatus,
+                      builder: (context, v, _) => !v.updateAvailable
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () => installLatestVersion(context),
+                                child: InfoChip(Icons.system_update,
+                                    'Update available: ${v.latest!.version} (you have v${v.installed})',
+                                    color: AppColors.income),
+                              ),
+                            ),
+                    ),
                   ])),
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
-                    onSelected: (v) {
+                    onOpened: refreshVersionStatus,
+                    onSelected: (v) async {
+                      if (v == 'update') installLatestVersion(context);
                       if (v == 'settings') context.go('/more/settings');
                       if (v == 'about') {
+                        final pkg = await PackageInfo.fromPlatform();
+                        if (!context.mounted) return;
                         showAboutDialog(
                           context: context,
                           applicationName: 'Life Tracker Pro',
-                          applicationVersion: 'Version 1.0.0',
+                          applicationVersion: 'Version ${pkg.version}',
                           applicationIcon: const Icon(Icons.auto_awesome, color: AppColors.primary),
                           children: const [Text('Manage tuition, finance, study & personal life — all in one place.')],
                         );
                       }
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'settings',
+                    itemBuilder: (_) => [
+                      PopupMenuItem(value: 'update',
+                          child: ValueListenableBuilder<VersionStatus>(
+                            valueListenable: versionStatus,
+                            builder: (context, v, _) => ListTile(
+                              leading: Icon(Icons.system_update,
+                                  color: v.updateAvailable ? AppColors.income : null),
+                              title: Text(v.updateAvailable ? 'Install update' : 'Install latest version'),
+                              subtitle: Text(v.label, style: TextStyle(
+                                  fontSize: 12,
+                                  color: v.updateAvailable ? AppColors.income : null)),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          )),
+                      const PopupMenuItem(value: 'settings',
                           child: ListTile(leading: Icon(Icons.settings), title: Text('Settings'), contentPadding: EdgeInsets.zero)),
-                      PopupMenuItem(value: 'about',
+                      const PopupMenuItem(value: 'about',
                           child: ListTile(leading: Icon(Icons.info_outline), title: Text('App info'), contentPadding: EdgeInsets.zero)),
                     ],
                   ),

@@ -93,6 +93,10 @@ final _router = GoRouter(
         if (extra is Txn) {
           return TransactionFormScreen(type: extra.type, existing: extra);
         }
+        if (extra is Map) {
+          return TransactionFormScreen(
+              type: (extra['type'] as String?) ?? 'expense', category: extra['category'] as String?);
+        }
         return TransactionFormScreen(type: (extra as String?) ?? 'expense');
       },
     ),

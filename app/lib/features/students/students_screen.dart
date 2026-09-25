@@ -49,6 +49,7 @@ class StudentsScreen extends ConsumerStatefulWidget {
 
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   String _q = '';
+  bool _showAll = false; // false = current students only
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
@@ -78,17 +79,48 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 onChanged: (v) => setState(() => _q = v.toLowerCase()),
               ),
             ),
+            AnimatedBuilder(
+              animation: repo.studentsL,
+              builder: (context, _) {
+                final all = repo.studentList;
+                final current = all.where((s) => s.isCurrent).length;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      segments: [
+                        ButtonSegment(value: false, label: Text('Current ($current)'),
+                            icon: const Icon(Icons.person, size: 18)),
+                        ButtonSegment(value: true, label: Text('All students (${all.length})'),
+                            icon: const Icon(Icons.groups, size: 18)),
+                      ],
+                      selected: {_showAll},
+                      onSelectionChanged: (v) => setState(() => _showAll = v.first),
+                    ),
+                  ),
+                );
+              },
+            ),
             Expanded(
               child: AnimatedBuilder(
                 animation: Listenable.merge([repo.studentsL, repo.schedulesL, repo.logsL]),
                 builder: (context, _) {
                   final list = repo.studentList
-                      .where((s) => s.name.toLowerCase().contains(_q))
-                      .toList();
+                      .where((s) => (_showAll || s.isCurrent) && s.name.toLowerCase().contains(_q))
+                      .toList()
+                    // in "All", current students first, previous ones after
+                    ..sort((a, b) => a.isCurrent == b.isCurrent ? 0 : (a.isCurrent ? -1 : 1));
                   if (list.isEmpty) {
+                    final none = repo.studentList.isEmpty;
                     return EmptyState(
                       icon: Icons.people_outline,
-                      message: _q.isEmpty ? 'No students yet.\nAdd your first student.' : 'No match.',
+                      message: _q.isNotEmpty
+                          ? 'No match.'
+                          : none
+                              ? 'No students yet.\nAdd your first student.'
+                              : 'No current students.\nOpen "All students" to see previous ones.',
                       cta: _q.isEmpty ? 'Add Student' : null,
                       onCta: () => context.push('/student-form'),
                     );
@@ -103,8 +135,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       final next = repo.nextClassFor(s.id);
                       final classes = repo.logsFor(s.id).length;
                       final last = repo.lastLog(s.id);
-                      return PadCard(
-                        tint: studentColor(s),
+                      final card = PadCard(
+                        tint: s.isCurrent ? studentColor(s) : null,
                         onTap: () => context.go('/students/${s.id}'),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
@@ -125,8 +157,14 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                           ]),
                           Gap.m,
                           Wrap(spacing: 8, runSpacing: 6, children: [
+                            if (!s.isCurrent)
+                              InfoChip(Icons.history,
+                                  s.leftDate == null ? 'Previous' : 'Previous · left ${fullDate(s.leftDate!)}',
+                                  color: AppColors.expense),
                             InfoChip(Icons.menu_book, '$classes ${classes == 1 ? 'class' : 'classes'}', color: AppColors.primary),
-                            if (next != null)
+                            if (!s.isCurrent)
+                              const SizedBox.shrink()
+                            else if (next != null)
                               InfoChip(Icons.schedule,
                                   'Next: ${weekdayNames[next.dayOfWeek]} ${minutesToTime(next.startMinutes)}',
                                   color: AppColors.savings)
@@ -141,6 +179,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                           ],
                         ]),
                       );
+                      return s.isCurrent ? card : Opacity(opacity: 0.6, child: card);
                     },
                   );
                 },
@@ -243,6 +282,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   IconButton(icon: const Icon(Icons.add_alarm),
                       tooltip: 'Schedule class',
                       onPressed: () => openScheduleSheet(context, ref, presetStudentId: id)),
+                  IconButton(
+                      icon: Icon(s.isCurrent ? Icons.person_off_outlined : Icons.person_add_alt_1),
+                      tooltip: s.isCurrent ? 'Mark as previous' : 'Mark as current',
+                      onPressed: () => setStudentCurrent(context, ref, s, !s.isCurrent)),
                   IconButton(icon: const Icon(Icons.edit),
                       tooltip: 'Edit student',
                       onPressed: () => context.push('/student-form', extra: id)),
@@ -424,6 +467,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
   final _days = <String>{};
   List<String> _classList = [];
   List<String> _subjectOptions = [];
+  Student? _existing;
+  bool _current = true;
 
   @override
   void initState() {
@@ -433,6 +478,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
     if (widget.id != null) {
       final s = ref.read(repoProvider).student(widget.id!);
       if (s != null) {
+        _existing = s;
+        _current = s.isCurrent;
         _name.text = s.name;
         _phone.text = s.phone;
         _institution.text = s.institution;
@@ -482,6 +529,13 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       extraPhones: _extraPhones.map((c) => c.text.trim()).where((x) => x.isNotEmpty).toList(),
       guardianName: _guardian.text.trim(),
       guardianPhone: _guardianPhone.text.trim(),
+      batch: _existing?.batch ?? '',
+      status: _current ? 'active' : 'previous',
+      leftOn: _current
+          ? ''
+          : (_existing?.leftOn.isNotEmpty ?? false)
+              ? _existing!.leftOn
+              : DateTime.now().toIso8601String().substring(0, 10),
     );
     await ref.read(repoProvider).saveStudent(s);
     if (mounted) context.pop();
@@ -518,6 +572,18 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                 onPressed: () => setState(() => _photo = ''), child: const Text('Remove photo'))),
           Gap.m,
           _text(_name, 'Name *'),
+          if (_existing != null) ...[
+            Gap.s,
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              title: const Text('Currently studying'),
+              subtitle: Text(_current
+                  ? 'Shown in Tuition, schedule and fees'
+                  : 'Previous student: hidden from Tuition list and schedule'),
+              value: _current,
+              onChanged: (v) => setState(() => _current = v),
+            ),
+          ],
           Gap.m,
           DropdownButtonFormField<String>(
             initialValue: _grade,
@@ -733,7 +799,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
-    final students = repo.studentList;
+    final students = repo.pickableStudents(_studentId);
     final subjOpts = (_studentId == null ? null : repo.student(_studentId!))?.subjects ?? const <String>[];
     final editing = widget.existing != null;
     return Scaffold(
@@ -941,4 +1007,23 @@ class _PhoneRow extends StatelessWidget {
           onPressed: () => _launch(context, Uri.parse('https://wa.me/$_wa'))),
     ]);
   }
+}
+
+/// Marks a student current/previous, with an Undo snackbar.
+Future<void> setStudentCurrent(BuildContext context, WidgetRef ref, Student s, bool current) async {
+  final repo = ref.read(repoProvider);
+  await repo.saveStudent(s.withCurrent(current));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(current
+          ? '${s.name} is a current student again'
+          : '${s.name} moved to previous students'),
+      // auto-hide even though it has an action (Flutter persists those by default)
+      persist: false,
+      duration: const Duration(seconds: 4),
+      action: SnackBarAction(
+          label: 'UNDO', textColor: AppColors.primary, onPressed: () => repo.saveStudent(s)),
+    ));
 }

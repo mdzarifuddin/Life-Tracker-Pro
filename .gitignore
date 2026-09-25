@@ -29,3 +29,6 @@ app/**/*.keystore
 
 # Misc
 *.log
+
+# Local design references (third-party screenshots) — not part of the app
+demo app UI for expense/

@@ -15,6 +15,7 @@ class Student {
   final int colorValue; // 0 = auto
   final List<String> subjects, weakSubjects, extraPhones, days;
   final String guardianName, guardianPhone, photo;
+  final String leftOn; // ISO date the student stopped ('' while current)
 
   Student({
     required this.id,
@@ -35,7 +36,18 @@ class Student {
     this.days = const [],
     this.guardianName = '',
     this.guardianPhone = '',
+    this.leftOn = '',
   });
+
+  /// 'active' = currently studying, 'previous' = stopped.
+  bool get isCurrent => status != 'previous';
+  DateTime? get leftDate => leftOn.isEmpty ? null : DateTime.tryParse(leftOn);
+
+  Student withCurrent(bool current, {DateTime? on}) => Student.fromMap({
+        ...toMap(),
+        'status': current ? 'active' : 'previous',
+        'leftOn': current ? '' : (on ?? DateTime.now()).toIso8601String().substring(0, 10),
+      });
 
   Map<String, dynamic> toMap() => {
         'id': id, 'name': name, 'phone': phone, 'grade': grade,
@@ -45,6 +57,7 @@ class Student {
         'subjects': subjects, 'weakSubjects': weakSubjects, 'extraPhones': extraPhones,
         'days': days,
         'guardianName': guardianName, 'guardianPhone': guardianPhone, 'photo': photo,
+        'leftOn': leftOn,
       };
 
   factory Student.fromMap(Map m) => Student(
@@ -58,6 +71,7 @@ class Student {
         extraPhones: _ls(m['extraPhones']), days: _ls(m['days']),
         guardianName: _s(m['guardianName']), guardianPhone: _s(m['guardianPhone']),
         photo: _s(m['photo']),
+        leftOn: _s(m['leftOn']),
       );
 
   /// Creation time decoded from the id (newId() = microseconds_random).
@@ -196,13 +210,15 @@ class Txn {
 
 class Category {
   final String id, name, type;
+  final String icon; // key in the built-in icon set ('' = pick by name)
   final bool isDefault;
-  Category({required this.id, required this.name, required this.type, this.isDefault = false});
+  Category({required this.id, required this.name, required this.type, this.icon = '', this.isDefault = false});
 
   Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'type': type, 'isDefault': isDefault};
+      {'id': id, 'name': name, 'type': type, 'icon': icon, 'isDefault': isDefault};
   factory Category.fromMap(Map m) => Category(
         id: _s(m['id']), name: _s(m['name']), type: _s(m['type']),
+        icon: _s(m['icon']),
         isDefault: m['isDefault'] == true,
       );
 }

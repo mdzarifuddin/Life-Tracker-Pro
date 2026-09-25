@@ -39,26 +39,45 @@ class Repo {
     Repo()._seed();
   }
 
+  /// Default finance categories: name → icon key (see kCategoryIcons).
+  static const _defaultExpense = {
+    'Food': 'restaurant', 'Eating Out': 'fastfood', 'Grocery': 'basket',
+    'Transport': 'bus', 'Rickshaw/CNG': 'rickshaw', 'Tuition Travel': 'train',
+    'Fuel': 'fuel', 'House Rent': 'house', 'Electricity': 'electricity',
+    'Gas': 'gas', 'Water': 'water', 'Internet': 'wifi',
+    'Mobile Recharge': 'phone', 'Bills': 'bill', 'Books': 'book',
+    'Stationery': 'pen', 'Education': 'school', 'Family': 'family',
+    'Medical': 'medical', 'Toiletry': 'soap', 'Clothes': 'clothes',
+    'Shopping': 'bag', 'Entertainment': 'movie', 'Sports': 'sports',
+    'Travel': 'flight', 'Gifts': 'gift', 'Charity': 'charity',
+    'Personal Care': 'salon', 'Electronics': 'devices', 'Repairs': 'repair',
+    'Loan/EMI': 'loan', 'Govt Job': 'govt', 'Thesis': 'thesis',
+    'Software': 'code', 'Subscriptions': 'subscription', 'Investment': 'invest',
+    'Other': 'other',
+  };
+  static const _defaultIncome = {
+    'Tuition': 'teach', 'Freelancing': 'laptop', 'Scholarship': 'award',
+    'Gift': 'gift', 'Salary': 'salary', 'Business': 'store',
+    'Bonus': 'bonus', 'Rent Income': 'house', 'Profit/Interest': 'invest',
+    'Refund': 'refund', 'Sales': 'sell', 'Other': 'other',
+  };
+
   void _seed() {
-    if (categories.isEmpty) {
-      const expense = [
-        'Food', 'Transport', 'Internet', 'Mobile Recharge', 'Books',
-        'Tuition Travel', 'Family', 'Medical', 'Shopping', 'Entertainment',
-        'Govt Job', 'Thesis', 'Software', 'Subscriptions', 'Investment',
-        'Grocery', 'Other',
-      ];
-      const income = [
-        'Tuition', 'Freelancing', 'Scholarship', 'Gift', 'Salary',
-        'Business', 'Other',
-      ];
-      for (final c in expense) {
-        final m = Category(id: newId(), name: c, type: 'expense', isDefault: true);
-        categories.put(m.id, m.toMap());
+    // First launch seeds everything; older installs get the newer defaults once.
+    if (settings.get('catsV2') != true) {
+      final existing = _all(categories, Category.fromMap)
+          .map((c) => '${c.type}|${c.name.toLowerCase()}')
+          .toSet();
+      void add(String type, Map<String, String> defaults) {
+        defaults.forEach((name, icon) {
+          if (existing.contains('$type|${name.toLowerCase()}')) return;
+          final m = Category(id: newId(), name: name, type: type, icon: icon, isDefault: true);
+          categories.put(m.id, m.toMap());
+        });
       }
-      for (final c in income) {
-        final m = Category(id: newId(), name: c, type: 'income', isDefault: true);
-        categories.put(m.id, m.toMap());
-      }
+      add('expense', _defaultExpense);
+      add('income', _defaultIncome);
+      settings.put('catsV2', true);
     }
     if (thesis.isEmpty) {
       const stages = [
@@ -78,6 +97,12 @@ class Repo {
 
   List<Student> get studentList =>
       _all(students, Student.fromMap)..sort((a, b) => a.name.compareTo(b.name));
+  List<Student> get currentStudents => studentList.where((s) => s.isCurrent).toList();
+
+  /// Students for a picker: current ones, plus [keepId] if it is a previous student.
+  List<Student> pickableStudents([String? keepId]) =>
+      studentList.where((s) => s.isCurrent || s.id == keepId).toList();
+
   Student? student(String id) =>
       students.containsKey(id) ? Student.fromMap(students.get(id) as Map) : null;
   List<ClassLog> logsFor(String sid) =>
@@ -126,12 +151,25 @@ class Repo {
 
   /// Students relevant to a given month: those created on/before that month's end.
   /// (Current/future months show all; past months hide later-added students.)
+  /// Previous students still appear for months up to the one they left in.
   List<Student> studentsForMonth(DateTime month) {
+    final start = DateTime(month.year, month.month, 1);
     final end = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
-    return studentList.where((s) => !s.createdAt.isAfter(end)).toList();
+    return studentList.where((s) {
+      if (s.createdAt.isAfter(end)) return false;
+      if (s.isCurrent) return true;
+      final left = s.leftDate ?? DateTime.now();
+      return !left.isBefore(start);
+    }).toList();
   }
 
-  List<ScheduleItem> get scheduleList => _all(schedules, ScheduleItem.fromMap);
+  /// Weekly schedule; classes of previous students are hidden.
+  List<ScheduleItem> get scheduleList {
+    final previous = studentList.where((s) => !s.isCurrent).map((s) => s.id).toSet();
+    return _all(schedules, ScheduleItem.fromMap)
+        .where((e) => !previous.contains(e.studentId))
+        .toList();
+  }
   List<ScheduleItem> scheduleForDay(int day) =>
       scheduleList.where((e) => e.dayOfWeek == day).toList()
         ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
@@ -254,7 +292,7 @@ class Repo {
     final now = DateTime.now();
     final m = monthKey(now);
     double total = 0;
-    for (final s in studentList) {
+    for (final s in studentsForMonth(now)) {
       final p = paymentFor(s.id, m);
       if (p?.status != 'paid') total += dueForMonth(s, now);
     }

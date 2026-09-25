@@ -159,7 +159,7 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
-    final students = repo.studentList;
+    final students = repo.pickableStudents(_studentId);
     final editing = widget.existing != null;
     return Padding(
       padding: const EdgeInsets.all(16),

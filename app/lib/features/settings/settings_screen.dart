@@ -83,18 +83,25 @@ class SettingsScreen extends ConsumerWidget {
             Gap.l,
             const SectionTitle('General'),
             Card(child: Column(children: [
-              ListTile(
-                leading: const Icon(Icons.system_update, color: AppColors.primary),
-                title: const Text('Check for updates'),
-                subtitle: const Text('Download the latest version from GitHub'),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Checking for updates…')));
-                  runUpdateCheck(context);
-                },
+              ValueListenableBuilder<VersionStatus>(
+                valueListenable: versionStatus,
+                builder: (context, v, _) => ListTile(
+                  leading: Icon(Icons.system_update,
+                      color: v.updateAvailable ? AppColors.income : AppColors.primary),
+                  title: Text(v.updateAvailable ? 'Update available' : 'Check for updates'),
+                  subtitle: Text(v.label.isEmpty ? 'Download the latest version from GitHub' : v.label),
+                  onTap: () => installLatestVersion(context),
+                ),
               ),
               const ListTile(leading: Icon(Icons.language), title: Text('Language'), subtitle: Text('English (বাংলা coming soon)')),
-              const ListTile(leading: Icon(Icons.info_outline), title: Text('Life Tracker Pro'), subtitle: Text('Version 1.0.0')),
+              ValueListenableBuilder<VersionStatus>(
+                valueListenable: versionStatus,
+                builder: (context, v, _) => ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('Life Tracker Pro'),
+                  subtitle: Text(v.installed.isEmpty ? 'Version —' : 'Version ${v.installed}'),
+                ),
+              ),
             ])),
           ],
         ),

@@ -176,7 +176,7 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final students = ref.read(repoProvider).studentList;
+    final students = ref.read(repoProvider).pickableStudents(_studentId);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
