@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +17,6 @@ import '../exams/exams_screen.dart';
 import '../schedule/routines_screen.dart' show addRoutineFromGallery, RoutineViewer;
 import 'batch_detail_screen.dart';
 import 'batch_screen.dart';
-import '../payments/payments_screen.dart' show showFeeSheet, feeStatusColor, feeStatusLabel, cycleLabel;
 import '../schedule/schedule_screen.dart';
 
 /// Per-student card color (custom if set, else derived from the name).
@@ -360,78 +359,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     );
   }
 
-  /// Every billing month the student has been with you: classes, due, paid, status.
-  Widget _monthHistory(BuildContext context, WidgetRef ref, Repo repo, Student s, List<ClassLog> logs) {
-    var start = s.createdAt;
-    for (final l in logs) {
-      if (l.date.isBefore(start)) start = l.date;
-    }
-    if (s.billingStartDate != null) start = s.billingStartDate!;
-    final first = repo.cycleMonthOf(s, start);
-    final last = s.isCurrent
-        ? repo.currentCycleMonth(s)
-        : repo.cycleMonthOf(s, s.leftDate ?? DateTime.now());
-    final months = <DateTime>[];
-    for (var m = last; !m.isBefore(first) && months.length < 60; m = DateTime(m.year, m.month - 1)) {
-      months.add(m);
-    }
-    if (months.isEmpty) return const PadCard(child: Text('No months yet.'));
-    // Months still owing money are listed; settled months move under "Paid months"
-    // (where a payment can still be opened and removed), months with nothing due are hidden.
-    final owing = <DateTime>[], settled = <DateTime>[];
-    for (final m in months) {
-      final st = repo.payState(s, m);
-      if (st.remaining > 0.5) {
-        owing.add(m);
-      } else if (st.paid > 0) {
-        settled.add(m);
-      }
-    }
-    Widget tile(DateTime m) => Builder(builder: (context) {
-          final st = repo.payState(s, m);
-          final classes = repo.classesInMonth(s, m);
-          final color = feeStatusColor(st.status);
-          return ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            onTap: () => showFeeSheet(context, ref, s, m),
-            title: Text(monthLabel(m), style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(
-                '$classes ${classes == 1 ? 'class' : 'classes'} · due ${taka(st.due)}'
-                '${st.carry > 0.5 ? ' + ${taka(st.carry)} previous' : ''} · paid ${taka(st.paid)}'
-                '${s.billingDay != 1 ? '\n${cycleLabel(repo, s, m)}' : ''}'),
-            isThreeLine: s.billingDay != 1,
-            trailing: Chip(
-              label: Text(feeStatusLabel(st.status),
-                  style: const TextStyle(color: Colors.white, fontSize: 11)),
-              backgroundColor: color, visualDensity: VisualDensity.compact),
-          );
-        });
-    return PadCard(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Column(children: [
-        if (owing.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Text('Nothing due.', style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        for (final m in owing) tile(m),
-        if (settled.isNotEmpty)
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('Paid months (${settled.length})',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: const Text('Tap a month to undo a payment'),
-              children: [for (final m in settled) tile(m)],
-            ),
-          ),
-      ]),
-    );
-  }
-
   /// Weekly timetable summary + every class already booked for a date.
   Widget _scheduledFor(BuildContext context, WidgetRef ref, Repo repo, Student s) {
     final mine = repo.scheduleList.where((e) => e.studentId == s.id).toList();
@@ -535,12 +462,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             final monthLogs = logs
                 .where((l) => !l.date.isBefore(cStart) && !l.date.isAfter(cEnd))
                 .toList();
-            final cycle = repo.currentCycleMonth(s);
-            final fee = repo.payState(s, cycle);
             final totalReceived = repo.paymentList
                 .where((p) => p.studentId == id)
                 .fold(0.0, (sum, p) => sum + p.paid);
-            final paid = fee.status == 'paid';
             return CustomScrollView(slivers: [
               SliverAppBar(
                 pinned: true,
@@ -619,17 +543,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     ]),
                   ])),
                   Gap.l,
-                  Row(children: [
-                    Expanded(child: FilledButton.tonalIcon(
-                      onPressed: () => context.push('/class-log', extra: id),
-                      icon: const Icon(Icons.edit_note), label: const Text('Log Class'))),
-                    Gap.m,
-                    Expanded(child: FilledButton.icon(
-                      style: FilledButton.styleFrom(backgroundColor: feeStatusColor(fee.status)),
-                      onPressed: () => showFeeSheet(context, ref, s, cycle),
-                      icon: Icon(paid ? Icons.check_circle : Icons.attach_money),
-                      label: Text(paid ? 'Fee Paid' : fee.status == 'partial' ? 'Partial' : 'Collect Fee'))),
-                  ]),
+                  SizedBox(width: double.infinity, child: FilledButton.tonalIcon(
+                    onPressed: () => context.push('/class-log', extra: id),
+                    icon: const Icon(Icons.edit_note), label: const Text('Log Class'))),
                   Gap.l,
                   SectionTitle('Routine pictures', icon: Icons.photo_library_outlined, color: AppColors.savings,
                       trailing: TextButton.icon(
@@ -637,9 +553,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                           icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                           label: const Text('Add'))),
                   _routinesFor(context, repo, id),
-                  Gap.l,
-                  const SectionTitle('Month by month', icon: Icons.calendar_month, color: AppColors.primary),
-                  _monthHistory(context, ref, repo, s, logs),
                   Gap.l,
                   SectionTitle('Scheduled classes', icon: Icons.event_available, color: AppColors.savings,
                       trailing: TextButton.icon(
