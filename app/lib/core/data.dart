@@ -594,28 +594,23 @@ class Repo {
     return (due: due, paid: paid, carry: carry, total: total, remaining: remaining, status: status);
   }
 
-  /// Record a full or partial payment on [date]; also creates the income record.
-  Future<void> addPayment(Student s, DateTime month, double amount, DateTime date,
-      {String account = '', int classes = 0}) async {
+  /// Record a full or partial payment on [date]. It stays in the student's records only:
+  /// nothing is added to Finance.
+  /// Returns the id of the new payment so it can be undone.
+  Future<String> addPayment(Student s, DateTime month, double amount, DateTime date,
+      {int classes = 0}) async {
     final mk = monthKey(month);
-    final txn = Txn(
-      id: newId(), type: 'income', category: 'Tuition', amount: amount,
-      date: date, account: account, note: s.name,
-      sourceRef: 'payment:${s.id}:$mk',
-    );
-    await saveTxn(txn);
     final old = paymentFor(s.id, mk);
+    final inst = PayInstallment(id: newId(), amount: amount, date: date, txnId: '', account: '', classes: classes);
     await _savePayment(Payment(
       id: old?.id ?? newId(), studentId: s.id, month: mk, amount: dueForMonth(s, month),
-      installments: [
-        ...?old?.installments,
-        PayInstallment(id: newId(), amount: amount, date: date, txnId: txn.id, account: account, classes: classes),
-      ],
+      installments: [...?old?.installments, inst],
       customDue: old?.customDue,
     ), s, month);
+    return inst.id;
   }
 
-  /// Remove one payment (and its income record).
+  /// Remove one payment (and its income record, if an older version made one).
   Future<void> removeInstallment(Payment p, String installmentId) async {
     final inst = p.installments.firstWhere((i) => i.id == installmentId);
     if (inst.txnId.isNotEmpty) await deleteTxn(inst.txnId);

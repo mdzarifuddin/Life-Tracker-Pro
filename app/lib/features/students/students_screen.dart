@@ -376,30 +376,58 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
       months.add(m);
     }
     if (months.isEmpty) return const PadCard(child: Text('No months yet.'));
+    // Months still owing money are listed; settled months move under "Paid months"
+    // (where a payment can still be opened and removed), months with nothing due are hidden.
+    final owing = <DateTime>[], settled = <DateTime>[];
+    for (final m in months) {
+      final st = repo.payState(s, m);
+      if (st.remaining > 0.5) {
+        owing.add(m);
+      } else if (st.paid > 0) {
+        settled.add(m);
+      }
+    }
+    Widget tile(DateTime m) => Builder(builder: (context) {
+          final st = repo.payState(s, m);
+          final classes = repo.classesInMonth(s, m);
+          final color = feeStatusColor(st.status);
+          return ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onTap: () => showFeeSheet(context, ref, s, m),
+            title: Text(monthLabel(m), style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(
+                '$classes ${classes == 1 ? 'class' : 'classes'} · due ${taka(st.due)}'
+                '${st.carry > 0.5 ? ' + ${taka(st.carry)} previous' : ''} · paid ${taka(st.paid)}'
+                '${s.billingDay != 1 ? '\n${cycleLabel(repo, s, m)}' : ''}'),
+            isThreeLine: s.billingDay != 1,
+            trailing: Chip(
+              label: Text(feeStatusLabel(st.status),
+                  style: const TextStyle(color: Colors.white, fontSize: 11)),
+              backgroundColor: color, visualDensity: VisualDensity.compact),
+          );
+        });
     return PadCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(children: [
-        for (final m in months)
-          Builder(builder: (context) {
-            final st = repo.payState(s, m);
-            final classes = repo.classesInMonth(s, m);
-            final color = feeStatusColor(st.status);
-            return ListTile(
+        if (owing.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Text('Nothing due.', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        for (final m in owing) tile(m),
+        if (settled.isNotEmpty)
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
               dense: true,
-              contentPadding: EdgeInsets.zero,
-              onTap: () => showFeeSheet(context, ref, s, m),
-              title: Text(monthLabel(m), style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                  '$classes ${classes == 1 ? 'class' : 'classes'} · due ${taka(st.due)}'
-                  '${st.carry > 0.5 ? ' + ${taka(st.carry)} previous' : ''} · paid ${taka(st.paid)}'
-                  '${s.billingDay != 1 ? '\n${cycleLabel(repo, s, m)}' : ''}'),
-              isThreeLine: s.billingDay != 1,
-              trailing: Chip(
-                label: Text(feeStatusLabel(st.status),
-                    style: const TextStyle(color: Colors.white, fontSize: 11)),
-                backgroundColor: color, visualDensity: VisualDensity.compact),
-            );
-          }),
+              title: Text('Paid months (${settled.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Tap a month to undo a payment'),
+              children: [for (final m in settled) tile(m)],
+            ),
+          ),
       ]),
     );
   }

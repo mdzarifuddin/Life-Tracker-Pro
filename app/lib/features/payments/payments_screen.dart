@@ -7,7 +7,6 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../models.dart';
-import '../finance/finance_screen.dart' show orderedAccounts;
 
 /// Details of a student's fee for one billing cycle: due, paid, every payment
 /// with its date, and buttons to add a full / partial payment.
@@ -41,7 +40,6 @@ class _FeeSheet extends ConsumerStatefulWidget {
 class _FeeSheetState extends ConsumerState<_FeeSheet> {
   final _amount = TextEditingController();
   DateTime _date = DateTime.now();
-  String _account = '';
 
   @override
   void dispose() {
@@ -100,8 +98,15 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter an amount')));
       return;
     }
-    await repo.addPayment(widget.student, widget.month, amount, _date,
-        account: _account, classes: classes);
+    final messenger = ScaffoldMessenger.of(context);
+    final id = await repo.addPayment(widget.student, widget.month, amount, _date, classes: classes);
+    messenger.showSnackBar(SnackBar(
+      content: Text('${taka(amount)} marked paid'),
+      action: SnackBarAction(label: 'UNDO', onPressed: () {
+        final p = repo.paymentFor(widget.student.id, monthKey(widget.month));
+        if (p != null && p.installments.any((i) => i.id == id)) repo.removeInstallment(p, id);
+      }),
+    ));
     _amount.clear();
     _classes.clear();
     setState(() => _classesPaid = 0);
@@ -173,7 +178,7 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     dense: true,
                     leading: const Icon(Icons.check_circle, color: AppColors.income),
                     title: Text(taka(i.amount), style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${fullDate(i.date)} · ${repo.accountName(i.account)}'
+                    subtitle: Text('${fullDate(i.date)}'
                         '${i.classes > 0 ? ' · ${i.classes} ${i.classes == 1 ? 'class' : 'classes'}' : ''}'),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
@@ -213,18 +218,6 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     },
                   ),
                 ]),
-                Gap.s,
-                DropdownButtonFormField<String>(
-                  initialValue: repo.accountById(_account) == null ? '' : _account,
-                  decoration: const InputDecoration(labelText: 'Received in'),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('No account')),
-                    ...orderedAccounts(repo).map((a) => DropdownMenuItem(
-                        value: a.id,
-                        child: Text(a.isMain ? a.name : '   ${a.name}'))),
-                  ],
-                  onChanged: (v) => setState(() => _account = v ?? ''),
-                ),
                 Gap.m,
                 Row(children: [
                   Expanded(child: OutlinedButton(
