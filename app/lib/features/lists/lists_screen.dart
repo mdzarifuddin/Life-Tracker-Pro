@@ -72,8 +72,8 @@ class _BazarTab extends StatelessWidget {
   Future<void> _markBought(ListItem it) async {
     if (it.estPrice > 0) {
       await repo.saveTxn(Txn(
-        id: newId(), type: 'expense', category: 'Grocery', amount: it.estPrice,
-        date: DateTime.now(), account: 'cash', note: it.name));
+        id: newId(), type: 'expense', category: 'Bazar', amount: it.estPrice,
+        date: DateTime.now(), note: it.name));
     }
     await repo.deleteItem(it.id);
   }
@@ -88,21 +88,23 @@ class _BazarTab extends StatelessWidget {
         child: Align(alignment: Alignment.centerLeft,
             child: Text('Tap to add', style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12))),
       ),
-      SizedBox(
-        height: 44,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _bazarQuickItems.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (c, i) {
-            final q = _bazarQuickItems[i];
-            return ActionChip(
-              avatar: const Icon(Icons.add, size: 16),
-              label: Text(q),
-              onPressed: () => repo.saveItem(ListItem(id: newId(), listType: 'bazar', name: q, category: 'Grocery')),
-            );
-          },
+      // short chips that wrap onto 2-3 rows (no sideways scrolling)
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 0,
+            children: _bazarQuickItems.map((q) => ActionChip(
+                  label: Text(q, style: const TextStyle(fontSize: 12.5)),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  onPressed: () => repo.saveItem(
+                      ListItem(id: newId(), listType: 'bazar', name: q, category: 'Bazar')),
+                )).toList(),
+          ),
         ),
       ),
       const Divider(height: 16),
@@ -173,8 +175,8 @@ class _BazarTab extends StatelessWidget {
     );
     if (total == null) return;
     if (total > 0) {
-      await repo.saveTxn(Txn(id: newId(), type: 'expense', category: 'Grocery', amount: total,
-          date: DateTime.now(), account: 'cash', note: 'Bazar trip'));
+      await repo.saveTxn(Txn(id: newId(), type: 'expense', category: 'Bazar', amount: total,
+          date: DateTime.now(), note: 'Bazar trip'));
     }
     for (final it in repo.itemsOf('bazar')) {
       await repo.deleteItem(it.id);
@@ -293,7 +295,7 @@ class _BazarMultiSheetState extends ConsumerState<_BazarMultiSheet> {
           onPressed: _selected.isEmpty ? null : () async {
             final repo = ref.read(repoProvider);
             for (final name in _selected) {
-              await repo.saveItem(ListItem(id: newId(), listType: 'bazar', name: name, category: 'Grocery'));
+              await repo.saveItem(ListItem(id: newId(), listType: 'bazar', name: name, category: 'Bazar'));
             }
             if (context.mounted) Navigator.pop(context);
           },
@@ -375,7 +377,7 @@ class _ItemSheetState extends ConsumerState<_ItemSheet> {
             await ref.read(repoProvider).saveItem(ListItem(
               id: widget.existing?.id ?? newId(), listType: widget.type,
               name: _name.text.trim(), qty: _qty.text.trim(),
-              category: bazar ? 'Grocery' : '', priority: _priority,
+              category: bazar ? 'Bazar' : '', priority: _priority,
               note: _note.text.trim(), estPrice: double.tryParse(_price.text.trim()) ?? 0,
             ));
             if (context.mounted) Navigator.pop(context);

@@ -6,6 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../models.dart';
+import 'routines_screen.dart';
 
 class ScheduleScreen extends ConsumerWidget {
   const ScheduleScreen({super.key});
@@ -14,13 +15,21 @@ class ScheduleScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.read(repoProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Schedule')),
+      appBar: AppBar(title: const Text('Schedule'), actions: [
+        IconButton(
+          tooltip: 'Routine pictures',
+          icon: const Icon(Icons.photo_library_outlined),
+          onPressed: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const RoutinesScreen())),
+        ),
+      ]),
       body: SafeArea(
         child: AnimatedBuilder(
           animation: Listenable.merge([repo.schedulesL, repo.studentsL]),
           builder: (context, _) {
             final conflicts = repo.conflictIds;
             final all = repo.scheduleList;
+            final dated = repo.datedUpcoming;
             if (all.isEmpty) {
               return EmptyState(
                 icon: Icons.calendar_today_outlined,
@@ -46,13 +55,41 @@ class ScheduleScreen extends ConsumerWidget {
                       Expanded(child: Text('You have overlapping classes (in red).')),
                     ]),
                   ),
+                if (dated.isNotEmpty) ...[
+                  SectionTitle('Booked dates', icon: Icons.event_available, color: AppColors.savings),
+                  for (final k in dated.map((e) => e.onDate).toSet()) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 4),
+                      child: Text(
+                          '${_dayName(DateTime.parse(k).weekday - 1)} · ${fullDate(DateTime.parse(k))}',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).hintColor)),
+                    ),
+                    ...dated.where((e) => e.onDate == k).map((s) => _card(context, ref, repo, s, conflicts)),
+                  ],
+                  Gap.m,
+                ],
                 for (var d = 0; d < 7; d++)
                   if (repo.scheduleForDay(d).isNotEmpty) ...[
                     SectionTitle('${_dayName(d)} · ${shortDate(_nextDate(d))}'),
-                    ...repo.scheduleForDay(d).map((s) {
-                      final st = repo.student(s.studentId);
-                      final conflict = conflicts.contains(s.id);
-                      return Padding(
+                    ...repo.scheduleForDay(d).map((s) => _card(context, ref, repo, s, conflicts)),
+                  ],
+              ],
+            );
+          },
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addSchedule',
+        onPressed: () => openScheduleSheet(context, ref),
+        icon: const Icon(Icons.add), label: const Text('Class'),
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, WidgetRef ref, Repo repo, ScheduleItem s, Set<String> conflicts) {
+    final st = repo.student(s.studentId);
+    final conflict = conflicts.contains(s.id);
+    return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Card(
                           shape: RoundedRectangleBorder(
@@ -73,6 +110,7 @@ class ScheduleScreen extends ConsumerWidget {
                                 style: const TextStyle(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                                 '${minutesToTime(s.startMinutes)} · ${s.durationMin} min'
+                                '${s.isDated ? '' : ' · every week'}'
                                 '${s.location.isNotEmpty ? ' · ${s.location}' : ''}'),
                             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                               const Icon(Icons.edit, size: 16),
@@ -83,19 +121,6 @@ class ScheduleScreen extends ConsumerWidget {
                             ]),
                           ),
                         ),
-                      );
-                    }),
-                  ],
-              ],
-            );
-          },
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'addSchedule',
-        onPressed: () => openScheduleSheet(context, ref),
-        icon: const Icon(Icons.add), label: const Text('Class'),
-      ),
     );
   }
 
@@ -138,6 +163,8 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
   TimeOfDay _time = const TimeOfDay(hour: 16, minute: 0);
   int _duration = 60;
   bool _isPersonal = false;
+  bool _weekly = true; // false = book specific date(s) in advance
+  final _dates = <DateTime>[];
   final _title = TextEditingController();
 
   @override
@@ -149,6 +176,10 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
       _studentId = e.isPersonal ? null : e.studentId;
       _title.text = e.title;
       _day = e.dayOfWeek;
+      if (e.isDated && e.dateOn != null) {
+        _weekly = false;
+        _dates.add(e.dateOn!);
+      }
       _time = TimeOfDay(hour: e.startMinutes ~/ 60, minute: e.startMinutes % 60);
       _duration = e.durationMin == 0 ? 60 : e.durationMin;
       final today = DateTime.now();
@@ -204,17 +235,61 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
             items: students.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
             onChanged: (v) => setState(() { _studentId = v; _applyDefaultTime(); }),
           ),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.calendar_today),
-          title: const Text('Day'),
-          subtitle: Text('${_dayNames[_day]} · from ${shortDate(_dayDate)}'),
-          onTap: () async {
-            final d = await showDatePicker(context: context, initialDate: _dayDate,
-                firstDate: DateTime(2020), lastDate: DateTime(2100));
-            if (d != null) setState(() { _dayDate = d; _day = d.weekday - 1; });
-          },
-        ),
+        if (widget.existing == null) ...[
+          Gap.s,
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: true, label: Text('Every week'), icon: Icon(Icons.repeat)),
+              ButtonSegment(value: false, label: Text('Specific dates'), icon: Icon(Icons.event)),
+            ],
+            selected: {_weekly},
+            onSelectionChanged: (s) => setState(() => _weekly = s.first),
+          ),
+        ],
+        if (_weekly)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today),
+            title: const Text('Day'),
+            subtitle: Text('${_dayNames[_day]} · from ${shortDate(_dayDate)}'),
+            onTap: () async {
+              final d = await showDatePicker(context: context, initialDate: _dayDate,
+                  firstDate: DateTime(2020), lastDate: DateTime(2100));
+              if (d != null) setState(() { _dayDate = d; _day = d.weekday - 1; });
+            },
+          )
+        else ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event_available),
+            title: Text(widget.existing == null ? 'Dates' : 'Date'),
+            subtitle: _dates.isEmpty ? const Text('Tap to pick a date') : null,
+            trailing: (widget.existing != null && _dates.isNotEmpty)
+                ? null
+                : const Icon(Icons.add),
+            onTap: () async {
+              final d = await showDatePicker(
+                  context: context,
+                  initialDate: _dates.isEmpty ? DateTime.now() : _dates.last,
+                  firstDate: DateTime(2020), lastDate: DateTime(2100));
+              if (d == null) return;
+              final day = DateTime(d.year, d.month, d.day);
+              setState(() {
+                if (widget.existing != null) _dates.clear();
+                if (!_dates.contains(day)) _dates.add(day);
+                _dates.sort();
+              });
+            },
+          ),
+          if (_dates.isNotEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 6, runSpacing: 4, children: _dates.map((d) => InputChip(
+                    label: Text('${_dayNames[d.weekday - 1].substring(0, 3)}, ${shortDate(d)}'),
+                    onDeleted: () => setState(() => _dates.remove(d)),
+                  )).toList()),
+            ),
+        ],
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.access_time),
@@ -244,15 +319,33 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
         FilledButton(
           onPressed: () async {
             if (_isPersonal ? _title.text.trim().isEmpty : _studentId == null) return;
-            await ref.read(repoProvider).saveSchedule(ScheduleItem(
-              id: widget.existing?.id ?? newId(),
-              studentId: _isPersonal ? '' : _studentId!,
-              title: _isPersonal ? _title.text.trim() : '',
-              dayOfWeek: _day,
-              startMinutes: _time.hour * 60 + _time.minute, durationMin: _duration,
-              location: widget.existing?.location ?? '',
-              reminderMin: widget.existing?.reminderMin ?? 30,
-            ));
+            if (!_weekly && _dates.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Pick at least one date')));
+              return;
+            }
+            final repo = ref.read(repoProvider);
+            ScheduleItem build(String id, int day, String onDate) => ScheduleItem(
+                  id: id,
+                  studentId: _isPersonal ? '' : _studentId!,
+                  title: _isPersonal ? _title.text.trim() : '',
+                  dayOfWeek: day,
+                  startMinutes: _time.hour * 60 + _time.minute, durationMin: _duration,
+                  location: widget.existing?.location ?? '',
+                  reminderMin: widget.existing?.reminderMin ?? 30,
+                  onDate: onDate,
+                );
+            if (_weekly) {
+              await repo.saveSchedule(build(widget.existing?.id ?? newId(), _day, ''));
+            } else {
+              // one class per picked date (editing keeps the original item)
+              for (var i = 0; i < _dates.length; i++) {
+                final d = _dates[i];
+                await repo.saveSchedule(build(
+                    i == 0 && widget.existing != null ? widget.existing!.id : newId(),
+                    d.weekday - 1, dateKey(d)));
+              }
+            }
             if (context.mounted) Navigator.pop(context);
           },
           child: const Text('Save'),

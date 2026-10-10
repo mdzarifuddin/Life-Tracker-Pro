@@ -9,6 +9,7 @@ import '../../core/quick_add.dart';
 import '../../core/theme.dart';
 import '../../core/updater.dart';
 import '../../core/widgets.dart';
+import '../../models.dart';
 import '../schedule/schedule_screen.dart';
 import '../tasks/tasks_screen.dart';
 
@@ -27,8 +28,7 @@ class DashboardScreen extends ConsumerWidget {
             repo.thesisL, repo.examsL, repo.tasksL, repo.jobtasksL, repo.scheddoneL,
           ]),
           builder: (context, _) {
-            final todayIdx = DateTime.now().weekday - 1;
-            final todays = repo.scheduleForDay(todayIdx);
+            final todays = repo.scheduleOnDate(DateTime.now());
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               children: [
@@ -143,6 +143,7 @@ class DashboardScreen extends ConsumerWidget {
                       );
                     }).toList(),
                   ),
+                ..._upcoming(context, ref, repo),
                 Gap.l,
                 SectionTitle('My Tasks', icon: Icons.checklist, color: AppColors.primary,
                     trailing: TextButton(onPressed: () => context.go('/more/tasks'), child: const Text('All'))),
@@ -217,7 +218,7 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
       floatingActionButton: GestureDetector(
-        onTap: () => showQuickAdd(context),
+        onTap: () => showQuickAdd(context, ref),
         child: Container(
           width: 60, height: 60,
           decoration: BoxDecoration(
@@ -231,6 +232,52 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Classes on the next days (weekly schedule), shown only when there are any.
+  List<Widget> _upcoming(BuildContext context, WidgetRef ref, Repo repo) {
+    final today = DateTime.now();
+    final rows = <(DateTime, ScheduleItem)>[];
+    for (var i = 1; i <= 7 && rows.length < 8; i++) {
+      final day = DateTime(today.year, today.month, today.day + i);
+      for (final it in repo.scheduleOnDate(day)) {
+        rows.add((day, it));
+      }
+    }
+    if (rows.isEmpty) return const [];
+    final shown = rows.take(8).toList();
+    String dayLabel(DateTime d) {
+      final diff = DateTime(d.year, d.month, d.day)
+          .difference(DateTime(today.year, today.month, today.day)).inDays;
+      return diff == 1 ? 'Tomorrow' : '${weekdayNames[d.weekday - 1]}, ${shortDate(d)}';
+    }
+    return [
+      Gap.l,
+      SectionTitle('Upcoming Schedule',
+          icon: Icons.upcoming, color: AppColors.savings,
+          trailing: TextButton(onPressed: () => context.go('/schedule'), child: const Text('All'))),
+      for (final (day, it) in shown)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: PadCard(
+            onTap: () => openScheduleSheet(context, ref, existing: it),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(children: [
+              Icon(it.isPersonal ? Icons.event_note : Icons.person, size: 18, color: AppColors.savings),
+              Gap.m,
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(it.isPersonal ? it.title : (repo.student(it.studentId)?.name ?? 'Unknown'),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(dayLabel(day),
+                    style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+              ])),
+              Text('${minutesToTime(it.startMinutes)} · ${it.durationMin}m',
+                  style: const TextStyle(color: AppColors.savings, fontWeight: FontWeight.w600, fontSize: 12)),
+            ]),
+          ),
+        ),
+    ];
   }
 
   int _jobPercent(Repo repo) {

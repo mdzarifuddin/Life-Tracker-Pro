@@ -130,17 +130,24 @@ class _Mf {
   Color get selFill => dark ? const Color(0xFF4F6B58) : const Color(0xFFD7F0DF);
 }
 
-const kAccounts = <String, String>{
-  'cash': 'Cash', 'bkash': 'bKash', 'nagad': 'Nagad', 'bank': 'Bank',
+const kAccountIcons = <String, IconData>{
+  'cash': Icons.payments_outlined,
+  'phone': Icons.phone_android_outlined,
+  'bank': Icons.account_balance_outlined,
+  'card': Icons.credit_card_outlined,
+  'savings': Icons.savings_outlined,
+  'wallet': Icons.account_balance_wallet_outlined,
 };
 
-IconData accountIcon(String a) {
-  switch (a) {
-    case 'bkash': case 'nagad': return Icons.phone_android_outlined;
-    case 'bank': return Icons.account_balance_outlined;
-    default: return Icons.payments_outlined;
-  }
+IconData accountIcon(Repo repo, String id) {
+  final a = repo.accountById(id);
+  return kAccountIcons[a?.icon] ?? kAccountIcons['wallet']!;
 }
+
+/// Main accounts each followed by their sub-accounts, in display order.
+List<FinAccount> orderedAccounts(Repo repo) => [
+      for (final m in repo.mainAccounts) ...[m, ...repo.subsOf(m.id)],
+    ];
 
 /// "৳ 3,982" with small ".00" like Monefy.
 Widget moneyText(double v, {required Color color, double size = 16, FontWeight weight = FontWeight.w500}) {
@@ -328,6 +335,104 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
       ));
   }
 
+  Future<void> _customizeCategories() async {
+    final repo = ref.read(repoProvider);
+    final mf = _Mf(context);
+    final cats = repo.categoriesOf('expense').map((c) => c.name).toList();
+    const max = 14;
+    final auto = repo.chartCats.isEmpty;
+    final sel = auto
+        ? cats.take(max).toList()
+        : repo.chartCats.where(cats.contains).toList();
+    String place(int i) => i < 4 ? 'Top' : i < 7 ? 'Right' : i < 11 ? 'Bottom' : 'Left';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: mf.bg,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Row(children: [
+                Expanded(child: Text('Chart icons (${sel.length}/$max)',
+                    style: TextStyle(color: mf.text, fontSize: 16, fontWeight: FontWeight.w600))),
+                TextButton(
+                  onPressed: () => setS(() => sel..clear()..addAll(cats.take(max))),
+                  child: const Text('Default')),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: Align(alignment: Alignment.centerLeft, child: Text(
+                  'Drag ≡ to set each icon\'s position. Order goes clockwise from the top-left.',
+                  style: TextStyle(color: mf.muted, fontSize: 12))),
+            ),
+            Flexible(child: SingleChildScrollView(child: Column(children: [
+              ReorderableListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                onReorder: (from, to) => setS(() {
+                  if (to > from) to--;
+                  sel.insert(to, sel.removeAt(from));
+                }),
+                children: [
+                  for (var i = 0; i < sel.length; i++)
+                    ListTile(
+                      key: ValueKey(sel[i]),
+                      dense: true,
+                      leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                        SizedBox(width: 22, child: Text('${i + 1}', style: TextStyle(color: mf.muted))),
+                        Icon(catIcon(sel[i]), color: catColor(sel[i])),
+                      ]),
+                      title: Text(sel[i], style: TextStyle(color: mf.text)),
+                      subtitle: Text(place(i), style: TextStyle(color: mf.muted, fontSize: 11)),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.remove_circle_outline, color: _Mf.red, size: 20),
+                          onPressed: () => setS(() => sel.removeAt(i))),
+                        ReorderableDragStartListener(
+                          index: i, child: Icon(Icons.drag_handle, color: mf.muted)),
+                      ]),
+                    ),
+                ],
+              ),
+              if (cats.any((n) => !sel.contains(n))) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                  child: Align(alignment: Alignment.centerLeft,
+                      child: Text('Tap to add', style: TextStyle(color: mf.muted, fontSize: 12))),
+                ),
+                for (final n in cats.where((n) => !sel.contains(n)))
+                  ListTile(
+                    dense: true,
+                    leading: Icon(catIcon(n), color: catColor(n)),
+                    title: Text(n, style: TextStyle(color: mf.text)),
+                    trailing: Icon(Icons.add_circle_outline, color: sel.length < max ? _Mf.green : mf.line, size: 22),
+                    onTap: sel.length < max ? () => setS(() => sel.add(n)) : null,
+                  ),
+              ],
+            ]))),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: SizedBox(width: double.infinity, child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: _Mf.green),
+                onPressed: () {
+                  repo.chartCats = sel.toList();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Save'))),
+            ),
+          ]),
+        ),
+      )),
+    );
+  }
+
   Future<void> _pickInterval() async {
     final now = DateTime.now();
     final r = await showDateRangePicker(
@@ -361,10 +466,15 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
         titleSpacing: 4,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Finance', style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic, fontWeight: FontWeight.w700)),
-          Text(_account == null ? 'All accounts' : kAccounts[_account]!,
+          Text(_account == null ? 'All accounts' : repo.accountName(_account!),
               style: const TextStyle(fontSize: 12, color: Colors.white70)),
         ]),
         actions: [
+          if (!_listMode)
+            IconButton(
+              tooltip: 'Choose shown categories',
+              icon: const Icon(Icons.tune),
+              onPressed: _customizeCategories),
           IconButton(
             tooltip: _listMode ? 'Chart' : 'Records',
             icon: Icon(_listMode ? Icons.donut_large : Icons.swap_vert),
@@ -377,12 +487,16 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
         ],
       ),
       body: AnimatedBuilder(
-        animation: Listenable.merge([repo.txnsL, repo.categoriesL]),
+        animation: Listenable.merge([repo.txnsL, repo.categoriesL, repo.accountsL, repo.settingsL]),
         builder: (context, _) {
           _syncCategoryIcons(repo);
+          if (_account != null && repo.accountById(_account!) == null) _account = null;
+          final accountIds = _account == null ? null : repo.accountIdsUnder(_account!);
+          final separate = repo.separateAccountIds; // not part of the All total
           final range = _rangeFor(_period, _anchor, _interval);
           final txns = repo.txnList
-              .where((t) => range.has(t.date) && (_account == null || t.account == _account))
+              .where((t) => range.has(t.date) &&
+                  (accountIds == null ? !separate.contains(t.account) : accountIds.contains(t.account)))
               .toList();
           final income = txns.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
           final expense = txns.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
@@ -419,6 +533,7 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
               Expanded(child: _ChartView(
                 txns: txns,
                 categories: repo.categoriesOf('expense'),
+                pinned: repo.chartCats,
                 income: income,
                 expense: expense,
                 onCategory: (c) => _add('expense', category: c),
@@ -441,91 +556,129 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
   }
 
   Widget _drawer(_Mf mf) {
-    Widget box({required Widget child, bool selected = false, required VoidCallback onTap}) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Material(
-            color: selected ? mf.selFill : Colors.transparent,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6), side: BorderSide(color: mf.line)),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: onTap,
-              child: SizedBox(height: 50, child: Center(child: child)),
+    final repo = ref.read(repoProvider);
+    Widget accountRow(FinAccount? a) {
+      final main = a == null || a.isMain;
+      final selected = _account == a?.id;
+      final bal = a == null
+          ? repo.totalTxns.fold(0.0, (s, t) => s + (t.type == 'income' ? t.amount : -t.amount))
+          : repo.accountBalance(a.id);
+      return Padding(
+        padding: EdgeInsets.only(bottom: 6, left: main ? 0 : 18),
+        child: Material(
+          color: selected ? mf.selFill : Colors.transparent,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6), side: BorderSide(color: mf.line)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: () { setState(() => _account = a?.id); Navigator.pop(context); },
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: main ? 8 : 5),
+              child: Row(children: [
+                Icon(a == null ? Icons.sell_outlined : accountIcon(repo, a.id),
+                    color: const Color(0xFFE0B03C), size: main ? 28 : 22),
+                const SizedBox(width: 10),
+                Expanded(child: Text(a == null ? 'All accounts' : a.name,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: mf.text, fontSize: main ? 15 : 13.5))),
+                moneyText(bal, color: bal < 0 ? _Mf.red : mf.muted, size: main ? 13 : 12),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget label(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+          child: Text(t, style: TextStyle(color: mf.muted, fontSize: 11, letterSpacing: 1.2,
+              fontWeight: FontWeight.w600)),
+        );
+
+    // small chips, side by side, so the period picker takes very little room
+    Widget chip(String text, {IconData? icon, bool selected = false, required VoidCallback onTap}) =>
+        Material(
+          color: selected ? mf.selFill : Colors.transparent,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16), side: BorderSide(color: mf.line)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (icon != null) ...[Icon(icon, color: mf.muted, size: 15), const SizedBox(width: 4)],
+                Text(text, style: TextStyle(color: mf.muted, fontSize: 13)),
+              ]),
             ),
           ),
         );
-
-    Widget periodBtn(FinPeriod p, String label, {VoidCallback? onTap}) => box(
-          selected: _period == p,
-          onTap: onTap ?? () { setState(() => _period = p); Navigator.pop(context); },
-          child: Text(label, style: TextStyle(color: mf.muted, fontSize: 16)),
-        );
+    Widget period(FinPeriod p, String t, {VoidCallback? onTap}) => chip(t,
+        selected: _period == p,
+        onTap: onTap ?? () { setState(() => _period = p); Navigator.pop(context); });
 
     return Drawer(
       backgroundColor: mf.bg,
-      width: 240,
+      width: 290,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
-        child: ListView(padding: const EdgeInsets.all(12), children: [
-          // account selector
-          Container(
-            margin: const EdgeInsets.only(bottom: 18),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6), border: Border.all(color: mf.line)),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: _account,
-                isExpanded: true,
-                dropdownColor: mf.bg,
-                iconEnabledColor: mf.muted,
-                itemHeight: 56,
-                items: [
-                  DropdownMenuItem<String?>(value: null, child: _accountTile(mf, null)),
-                  ...kAccounts.keys.map((a) =>
-                      DropdownMenuItem<String?>(value: a, child: _accountTile(mf, a))),
-                ],
-                onChanged: (v) { setState(() => _account = v); Navigator.pop(context); },
+        child: Column(children: [
+          // accounts: take the free space and scroll if there are many
+          Expanded(
+            child: ListView(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), children: [
+              label('ACCOUNTS'),
+              accountRow(null),
+              ...orderedAccounts(repo).map(accountRow),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: mf.muted),
+                  onPressed: () async {
+                    final nav = Navigator.of(context);
+                    nav.pop(); // close the drawer
+                    // tapping an account there comes back here showing its tracker
+                    final id = await nav.push<String>(
+                        MaterialPageRoute(builder: (_) => const AccountsScreen()));
+                    if (id != null && mounted) setState(() => _account = id);
+                  },
+                  icon: const Icon(Icons.account_tree_outlined, size: 18),
+                  label: const Text('Manage accounts'),
+                ),
               ),
-            ),
+            ]),
           ),
-          periodBtn(FinPeriod.day, 'Day'),
-          periodBtn(FinPeriod.week, 'Week'),
-          periodBtn(FinPeriod.month, 'Month'),
-          periodBtn(FinPeriod.year, 'Year'),
-          periodBtn(FinPeriod.all, 'All'),
-          periodBtn(FinPeriod.interval, 'Interval',
-              onTap: () { Navigator.pop(context); _pickInterval(); }),
-          box(
-            onTap: () { Navigator.pop(context); _chooseDate(); },
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.event_available_outlined, color: mf.muted, size: 20),
-              const SizedBox(width: 8),
-              Text('Choose date', style: TextStyle(color: mf.muted, fontSize: 16)),
+          Divider(height: 1, color: mf.line),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              label('PERIOD'),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                period(FinPeriod.day, 'Day'),
+                period(FinPeriod.week, 'Week'),
+                period(FinPeriod.month, 'Month'),
+                period(FinPeriod.year, 'Year'),
+                period(FinPeriod.all, 'All'),
+                period(FinPeriod.interval, 'Interval',
+                    onTap: () { Navigator.pop(context); _pickInterval(); }),
+                chip('Date', icon: Icons.event_available_outlined,
+                    onTap: () { Navigator.pop(context); _chooseDate(); }),
+              ]),
             ]),
           ),
         ]),
       ),
     );
   }
-
-  Widget _accountTile(_Mf mf, String? a) => Row(children: [
-        Icon(a == null ? Icons.sell_outlined : accountIcon(a), color: const Color(0xFFE0B03C), size: 30),
-        const SizedBox(width: 10),
-        Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(a == null ? 'All accounts' : kAccounts[a]!, style: TextStyle(color: mf.muted, fontSize: 16)),
-          Text('BDT', style: TextStyle(color: mf.text, fontSize: 11)),
-        ]),
-      ]);
 }
 
 /// Donut in the middle, category icons with % arranged around it.
 class _ChartView extends StatelessWidget {
   const _ChartView({
-    required this.txns, required this.categories, required this.income,
+    required this.txns, required this.categories, required this.pinned, required this.income,
     required this.expense, required this.onCategory, required this.onCenter});
   final List<Txn> txns;
   final List<Category> categories;
+  final List<String> pinned; // user-chosen slots; empty = automatic
   final double income, expense;
   final ValueChanged<String> onCategory;
   final VoidCallback onCenter;
@@ -539,7 +692,11 @@ class _ChartView extends StatelessWidget {
     }
     // spent categories first (largest first), then the rest in stored order
     final spent = byCat.keys.toList()..sort((a, b) => byCat[b]!.compareTo(byCat[a]!));
-    final names = <String>[...spent, ...categories.map((c) => c.name).where((n) => !byCat.containsKey(n))];
+    final existing = categories.map((c) => c.name).toSet();
+    final chosen = pinned.where(existing.contains).toList();
+    final names = chosen.isNotEmpty
+        ? chosen
+        : <String>[...spent, ...categories.map((c) => c.name).where((n) => !byCat.containsKey(n))];
 
     return LayoutBuilder(builder: (context, box) {
       final w = box.maxWidth, h = box.maxHeight;
@@ -619,12 +776,14 @@ class _CatSlot extends StatelessWidget {
           onTap: onTap,
           radius: 36,
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(catIcon(name), color: catColor(name), size: 38),
+            Icon(catIcon(name), color: catColor(name), size: 32),
+            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: catColor(name), fontSize: 11)),
             SizedBox(
-              height: 18,
+              height: 15,
               child: percent == null
                   ? null
-                  : Text('${percent!.round()}%', style: TextStyle(color: textColor, fontSize: 13)),
+                  : Text('${percent!.round()}%', style: TextStyle(color: textColor, fontSize: 12)),
             ),
           ]),
         ),
@@ -806,8 +965,38 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   String? _category;
   String _expr = '';
   final _note = TextEditingController();
-  String _account = 'cash';
+  final _noteFocus = FocusNode();
+  String _account = ''; // '' = no account
   DateTime _date = DateTime.now();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    _noteFocus.dispose();
+    super.dispose();
+  }
+
+  /// Earlier notes (from saved records) that match what is being typed. With nothing
+  /// typed it offers recent notes of the chosen category.
+  List<String> _noteHints(String typed) {
+    final q = typed.trim().toLowerCase();
+    if (q.isEmpty && _category == null) return const [];
+    final seen = <String>{};
+    final starts = <String>[], contains = <String>[];
+    for (final t in ref.read(repoProvider).txnList) { // newest first
+      final n = t.note.trim();
+      if (n.isEmpty || t.type != _type || t.sourceRef.isNotEmpty) continue;
+      if (q.isEmpty && t.category != _category) continue;
+      final l = n.toLowerCase();
+      if (l == q || !seen.add(l)) continue;
+      if (q.isEmpty || l.startsWith(q)) {
+        starts.add(n);
+      } else if (l.contains(q)) {
+        contains.add(n);
+      }
+    }
+    return [...starts, ...contains].take(5).toList();
+  }
 
   bool get _editing => widget.existing != null;
   bool get _isIncome => _type == 'income';
@@ -824,6 +1013,11 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
       _account = e.account;
       _note.text = e.note;
       _date = e.date;
+    } else {
+      // start with the account used for the previous record (if it still exists)
+      final repo = ref.read(repoProvider);
+      final last = repo.txnList.isEmpty ? '' : repo.txnList.first.account;
+      if (repo.accountById(last) != null) _account = last;
     }
   }
 
@@ -972,6 +1166,38 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
     );
   }
 
+  /// Earlier records that look like this one: same amount, or matching what is typed
+  /// in the note. Tapping one fills the type (category) + note and saves.
+  List<Txn> _suggestions(Repo repo) {
+    final amt = _eval(_expr) ?? 0;
+    final q = _note.text.trim().toLowerCase();
+    if (amt <= 0 && q.isEmpty) return const [];
+    final cats = repo.categoriesOf(_type).map((c) => c.name).toSet();
+    final seen = <String>{};
+    final hits = <(int, Txn)>[];
+    for (final t in repo.txnList) { // newest first
+      if (t.type != _type || t.sourceRef.isNotEmpty || t.id == widget.existing?.id) continue;
+      if (!cats.contains(t.category)) continue;
+      final sameAmt = amt > 0 && (t.amount - amt).abs() < 0.01;
+      final noteHit = q.isNotEmpty &&
+          (t.note.toLowerCase().contains(q) || t.category.toLowerCase().contains(q));
+      if (q.isNotEmpty ? !noteHit : !sameAmt) continue;
+      if (!seen.add('${t.category}|${t.note.toLowerCase()}|${t.amount}')) continue;
+      hits.add(((sameAmt ? 2 : 0) + (noteHit ? 1 : 0), t));
+    }
+    hits.sort((a, b) => b.$1.compareTo(a.$1)); // stable: newest first within a score
+    return hits.take(6).map((h) => h.$2).toList();
+  }
+
+  Future<void> _useSuggestion(Txn t) async {
+    setState(() {
+      _category = t.category;
+      _note.text = t.note;
+      if ((_eval(_expr) ?? 0) <= 0) _expr = _fmt(t.amount);
+    });
+    await _save();
+  }
+
   Future<void> _chooseAndSave() async {
     final c = await _pickCategory();
     if (c == null) return;
@@ -1023,17 +1249,36 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
 
   Future<void> _pickAccount() async {
     final mf = _Mf(context);
+    final repo = ref.read(repoProvider);
     final a = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: mf.bg,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: kAccounts.entries.map((e) => ListTile(
-          leading: Icon(accountIcon(e.key), color: _Mf.green),
-          title: Text(e.value, style: TextStyle(color: mf.text)),
-          trailing: e.key == _account ? const Icon(Icons.check, color: _Mf.green) : null,
-          onTap: () => Navigator.pop(ctx, e.key),
-        )).toList()),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+          child: ListView(shrinkWrap: true, children: [
+            ListTile(
+              leading: const Icon(Icons.block, color: _Mf.green),
+              title: Text('No account', style: TextStyle(color: mf.text)),
+              trailing: _account.isEmpty ? const Icon(Icons.check, color: _Mf.green) : null,
+              onTap: () => Navigator.pop(ctx, ''),
+            ),
+            ...orderedAccounts(repo).map((e) => ListTile(
+              contentPadding: EdgeInsets.only(left: e.isMain ? 16 : 40, right: 16),
+              leading: Icon(accountIcon(repo, e.id), color: _Mf.green),
+              title: Text(e.name, style: TextStyle(color: mf.text)),
+              subtitle: e.isMain
+                  ? (e.inTotal ? null : Text('separate · not in the total',
+                      style: TextStyle(color: mf.muted, fontSize: 12)))
+                  : Text('in ${repo.accountName(e.parentId)}',
+                      style: TextStyle(color: mf.muted, fontSize: 12)),
+              trailing: e.id == _account ? const Icon(Icons.check, color: _Mf.green) : null,
+              onTap: () => Navigator.pop(ctx, e.id),
+            )),
+          ]),
+        ),
       ),
     );
     if (a != null) setState(() => _account = a);
@@ -1152,8 +1397,10 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
                     child: SizedBox(
                       width: 68,
                       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(accountIcon(_account), color: Colors.white, size: 30),
-                        Text(kAccounts[_account]!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        Icon(accountIcon(ref.read(repoProvider), _account), color: Colors.white, size: 30),
+                        Text(ref.read(repoProvider).accountById(_account)?.name ?? 'Account',
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 12)),
                       ]),
                     ),
                   ),
@@ -1181,20 +1428,90 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
           // note
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: TextField(
-              controller: _note,
-              style: TextStyle(color: mf.text),
-              decoration: InputDecoration(
-                filled: false,
-                hintText: 'Add note',
-                hintStyle: TextStyle(color: mf.muted.withValues(alpha: 0.7)),
-                prefixIcon: Icon(Icons.edit_outlined, color: mf.muted),
-                border: UnderlineInputBorder(borderSide: BorderSide(color: mf.line)),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: mf.line)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: mf.muted)),
+            child: RawAutocomplete<String>(
+              textEditingController: _note,
+              focusNode: _noteFocus,
+              optionsViewOpenDirection: OptionsViewOpenDirection.up,
+              optionsBuilder: (v) => _noteHints(v.text),
+              onSelected: (n) {
+                // also fills the type when it is still empty
+                if (_category == null) {
+                  for (final t in ref.read(repoProvider).txnList) {
+                    if (t.note.trim() == n && t.type == _type && t.sourceRef.isEmpty) {
+                      setState(() => _category = t.category);
+                      break;
+                    }
+                  }
+                }
+                setState(() {});
+              },
+              fieldViewBuilder: (context, c, f, onSubmit) => TextField(
+                controller: c,
+                focusNode: f,
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(color: mf.text),
+                decoration: InputDecoration(
+                  filled: false,
+                  hintText: 'Add note',
+                  hintStyle: TextStyle(color: mf.muted.withValues(alpha: 0.7)),
+                  prefixIcon: Icon(Icons.edit_outlined, color: mf.muted),
+                  border: UnderlineInputBorder(borderSide: BorderSide(color: mf.line)),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: mf.line)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: mf.muted)),
+                ),
+              ),
+              optionsViewBuilder: (context, onSelected, options) => Align(
+                alignment: Alignment.bottomLeft,
+                child: Material(
+                  color: mf.keyFill,
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(8),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width - 40, maxHeight: 220),
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      children: [
+                        for (final o in options)
+                          ListTile(
+                            dense: true,
+                            leading: Icon(Icons.history, size: 18, color: mf.muted),
+                            title: Text(o, style: TextStyle(color: mf.text)),
+                            onTap: () => onSelected(o),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
+          Builder(builder: (context) {
+            final sug = _suggestions(ref.read(repoProvider));
+            if (sug.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Earlier similar costs — tap to use',
+                    style: TextStyle(color: mf.muted, fontSize: 11.5)),
+                const SizedBox(height: 4),
+                Wrap(spacing: 6, runSpacing: 4, children: [
+                  for (final t in sug)
+                    ActionChip(
+                      avatar: Icon(catIcon(t.category), size: 16, color: catColor(t.category)),
+                      label: Text(
+                          '${t.note.isEmpty ? t.category : '${t.note} · ${t.category}'} ৳${_fmt(t.amount)}',
+                          style: TextStyle(color: mf.text, fontSize: 12)),
+                      backgroundColor: mf.keyFill,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onPressed: () => _useSuggestion(t),
+                    ),
+                ]),
+              ]),
+            );
+          }),
           const Spacer(flex: 2),
           if (_category != null)
             Padding(
@@ -1313,6 +1630,266 @@ class _NewCategoryDialogState extends State<_NewCategoryDialog> {
           onPressed: _submit,
           child: const Text('Add'),
         ),
+      ],
+    );
+  }
+}
+
+/// Manage main accounts and their sub-accounts.
+class AccountsScreen extends ConsumerWidget {
+  const AccountsScreen({super.key});
+
+  Future<void> _edit(BuildContext context, WidgetRef ref, {FinAccount? existing, String? parentId}) async {
+    final repo = ref.read(repoProvider);
+    // an account can be moved under another one unless it has sub-accounts itself
+    final canMove = existing != null && (!existing.isMain || repo.subsOf(existing.id).isEmpty);
+    final res = await showDialog<_AccountResult>(
+      context: context,
+      builder: (_) => _AccountDialog(
+        initialName: existing?.name ?? '',
+        initialIcon: existing?.icon ?? (parentId == null ? 'wallet' : repo.accountById(parentId)?.icon ?? 'wallet'),
+        title: existing != null
+            ? 'Edit account'
+            : parentId == null ? 'New account (person or group)' : 'New sub-account of ${repo.accountName(parentId)}',
+        parents: canMove ? repo.mainAccounts.where((m) => m.id != existing.id).toList() : const [],
+        initialParent: existing?.parentId ?? '',
+        offerSubs: existing == null && parentId == null,
+        showTotalSwitch: existing == null ? parentId == null : existing.isMain,
+        initialInTotal: existing?.inTotal ?? true,
+      ),
+    );
+    if (res == null) return;
+    final id = existing?.id ?? newId();
+    await repo.saveAccount(FinAccount(
+      id: id, name: res.name, icon: res.icon, inTotal: res.inTotal,
+      parentId: existing == null ? (parentId ?? '') : (canMove ? res.parent : existing.parentId)));
+    for (final w in res.subs) {
+      await repo.saveAccount(FinAccount(id: newId(), name: w.$1, icon: w.$2, parentId: id));
+    }
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref, FinAccount a) async {
+    final repo = ref.read(repoProvider);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Delete ${a.name}?'),
+        content: Text(a.isMain
+            ? 'Only accounts with no records and no sub-accounts can be deleted.'
+            : 'Its records move to ${repo.accountName(a.parentId)}.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _Mf.red),
+              onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final err = await repo.deleteAccount(a.id);
+    if (err != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(repoProvider);
+    final mf = _Mf(context);
+    return Scaffold(
+      backgroundColor: mf.bg,
+      appBar: AppBar(
+        backgroundColor: mf.bar,
+        foregroundColor: Colors.white,
+        title: const Text('Accounts'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(22),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 6),
+            child: Text('Tap an account to open its expense tracker',
+                style: TextStyle(color: Colors.white70, fontSize: 12)),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: _Mf.green,
+        foregroundColor: Colors.white,
+        onPressed: () => _edit(context, ref),
+        icon: const Icon(Icons.add),
+        label: const Text('Account'),
+      ),
+      body: AnimatedBuilder(
+        animation: Listenable.merge([repo.accountsL, repo.txnsL]),
+        builder: (context, _) {
+          return ListView(padding: const EdgeInsets.fromLTRB(12, 12, 12, 90), children: [
+            for (final m in repo.mainAccounts)
+              Card(
+                color: mf.keyFill,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Column(children: [
+                  ListTile(
+                    onTap: () => Navigator.pop(context, m.id),
+                    leading: Icon(accountIcon(repo, m.id), color: _Mf.green, size: 30),
+                    title: Text(m.name, style: TextStyle(color: mf.text, fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                        m.inTotal ? 'Total incl. sub-accounts' : 'Separate · not in the All total',
+                        style: TextStyle(color: m.inTotal ? mf.muted : Colors.orange, fontSize: 11)),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      moneyText(repo.accountBalance(m.id),
+                          color: repo.accountBalance(m.id) < 0 ? _Mf.red : _Mf.green, size: 16),
+                      PopupMenuButton<String>(
+                        onSelected: (v) {
+                          if (v == 'sub') _edit(context, ref, parentId: m.id);
+                          if (v == 'edit') _edit(context, ref, existing: m);
+                          if (v == 'del') _delete(context, ref, m);
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: 'sub', child: Text('Add sub-account')),
+                          const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          const PopupMenuItem(value: 'del', child: Text('Delete')),
+                        ],
+                      ),
+                    ]),
+                  ),
+                  for (final s in repo.subsOf(m.id))
+                    ListTile(
+                      dense: true,
+                      onTap: () => Navigator.pop(context, s.id),
+                      contentPadding: const EdgeInsets.only(left: 40, right: 4),
+                      leading: Icon(accountIcon(repo, s.id), color: mf.muted, size: 22),
+                      title: Text(s.name, style: TextStyle(color: mf.text)),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        moneyText(repo.accountBalance(s.id),
+                            color: repo.accountBalance(s.id) < 0 ? _Mf.red : mf.text, size: 14),
+                        IconButton(
+                          icon: Icon(Icons.edit_outlined, size: 18, color: mf.muted),
+                          onPressed: () => _edit(context, ref, existing: s)),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline, size: 18, color: mf.muted),
+                          onPressed: () => _delete(context, ref, s)),
+                      ]),
+                    ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _edit(context, ref, parentId: m.id),
+                      style: TextButton.styleFrom(foregroundColor: _Mf.green),
+                      icon: const Icon(Icons.subdirectory_arrow_right, size: 18),
+                      label: const Text('Add sub-account'),
+                    ),
+                  ),
+                ]),
+              ),
+          ]);
+        },
+      ),
+    );
+  }
+}
+
+class _AccountResult {
+  _AccountResult(this.name, this.icon, this.parent, this.subs, this.inTotal);
+  final String name, icon, parent; // parent '' = top-level account
+  final bool inTotal;
+  final List<(String, String)> subs; // wallets to create inside (name, icon)
+}
+
+class _AccountDialog extends StatefulWidget {
+  const _AccountDialog({
+    required this.initialName, required this.initialIcon, required this.title,
+    this.parents = const [], this.initialParent = '', this.offerSubs = false,
+    this.showTotalSwitch = false, this.initialInTotal = true});
+  final bool showTotalSwitch, initialInTotal;
+  final String initialName, initialIcon, title, initialParent;
+  final List<FinAccount> parents;
+  final bool offerSubs;
+  @override
+  State<_AccountDialog> createState() => _AccountDialogState();
+}
+
+class _AccountDialogState extends State<_AccountDialog> {
+  static const _wallets = <(String, String)>[
+    ('Cash', 'cash'), ('bKash', 'phone'), ('Nagad', 'phone'), ('Bank', 'bank'), ('Card', 'card'),
+  ];
+  late final _name = TextEditingController(text: widget.initialName);
+  late String _icon = widget.initialIcon;
+  late String _parent = widget.parents.any((p) => p.id == widget.initialParent) ? widget.initialParent : '';
+  final _subs = <String>{'Cash', 'bKash', 'Bank'};
+  late bool _inTotal = widget.initialInTotal;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: _name, autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+                labelText: 'Name',
+                helperText: widget.offerSubs ? 'e.g. Husband, Wife, Business' : null)),
+        const SizedBox(height: 16),
+        Wrap(spacing: 8, runSpacing: 8, children: kAccountIcons.entries.map((e) => ChoiceChip(
+              label: Icon(e.value, size: 22),
+              selected: _icon == e.key,
+              onSelected: (_) => setState(() => _icon = e.key),
+            )).toList()),
+        if (widget.showTotalSwitch) ...[
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            activeThumbColor: _Mf.green,
+            title: const Text('Add to the total'),
+            subtitle: Text(_inTotal
+                ? 'Counted in "All accounts"'
+                : 'Separate account: kept out of the All total'),
+            value: _inTotal,
+            onChanged: (v) => setState(() => _inTotal = v),
+          ),
+        ],
+        if (widget.parents.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _parent,
+            decoration: const InputDecoration(labelText: 'Belongs to'),
+            items: [
+              const DropdownMenuItem(value: '', child: Text('— none (top-level) —')),
+              for (final p in widget.parents) DropdownMenuItem(value: p.id, child: Text(p.name)),
+            ],
+            onChanged: (v) => setState(() => _parent = v ?? ''),
+          ),
+        ],
+        if (widget.offerSubs) ...[
+          const SizedBox(height: 16),
+          const Align(alignment: Alignment.centerLeft,
+              child: Text('Create inside it', style: TextStyle(fontWeight: FontWeight.w600))),
+          const SizedBox(height: 6),
+          Align(alignment: Alignment.centerLeft, child: Wrap(spacing: 6, runSpacing: 4, children: [
+            for (final w in _wallets)
+              FilterChip(
+                label: Text(w.$1),
+                selected: _subs.contains(w.$1),
+                onSelected: (v) => setState(() => v ? _subs.add(w.$1) : _subs.remove(w.$1)),
+              ),
+          ])),
+        ],
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: _Mf.green),
+          onPressed: () {
+            final n = _name.text.trim();
+            if (n.isEmpty) return;
+            Navigator.pop(context, _AccountResult(n, _icon, _parent,
+                widget.offerSubs ? _wallets.where((w) => _subs.contains(w.$1)).toList() : const [], _inTotal));
+          },
+          child: const Text('Save')),
       ],
     );
   }

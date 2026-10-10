@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../features/schedule/schedule_screen.dart';
+import '../features/tasks/tasks_screen.dart';
 import 'theme.dart';
 
-/// Quick-add bottom sheet (expense / income / student / class log).
-void showQuickAdd(BuildContext context) {
+/// Quick-add bottom sheet (expense / income / student).
+void showQuickAdd(BuildContext context, WidgetRef ref) {
   showModalBottomSheet(
     context: context,
     showDragHandle: true,
@@ -24,8 +27,10 @@ void showQuickAdd(BuildContext context) {
               () { ctx.pop(); ctx.push('/txn-form', extra: 'income'); }),
           _QuickTile(Icons.person_add_alt, 'Add Student', AppColors.primary,
               () { ctx.pop(); ctx.push('/student-form'); }),
-          _QuickTile(Icons.edit_note, 'Log Class', AppColors.savings,
-              () { ctx.pop(); ctx.push('/class-log'); }),
+          _QuickTile(Icons.add_task, 'Add Task', AppColors.warning,
+              () { ctx.pop(); showTaskSheet(context); }),
+          _QuickTile(Icons.add_alarm, 'Add Schedule', AppColors.savings,
+              () { ctx.pop(); openScheduleSheet(context, ref); }),
           const SizedBox(height: 8),
         ],
       ),

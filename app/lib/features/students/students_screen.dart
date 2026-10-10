@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,6 +14,10 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../models.dart';
 import '../exams/exams_screen.dart';
+import '../schedule/routines_screen.dart' show addRoutineFromGallery, RoutineViewer;
+import 'batch_detail_screen.dart';
+import 'batch_screen.dart';
+import '../payments/payments_screen.dart' show showFeeSheet, feeStatusColor, feeStatusLabel, cycleLabel;
 import '../schedule/schedule_screen.dart';
 
 /// Per-student card color (custom if set, else derived from the name).
@@ -27,17 +32,36 @@ class StudentAvatar extends StatelessWidget {
   final double radius;
   @override
   Widget build(BuildContext context) {
+    final Widget avatar;
     if (student.photo.isNotEmpty) {
-      return CircleAvatar(radius: radius, backgroundImage: MemoryImage(base64Decode(student.photo)));
+      avatar = CircleAvatar(radius: radius, backgroundImage: MemoryImage(base64Decode(student.photo)));
+    } else {
+      final c = studentColor(student);
+      avatar = CircleAvatar(
+        radius: radius,
+        backgroundColor: c.withValues(alpha: 0.18),
+        foregroundColor: c,
+        child: Text(student.name.isEmpty ? '?' : student.name[0].toUpperCase(),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: radius * 0.8)),
+      );
     }
-    final c = studentColor(student);
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: c.withValues(alpha: 0.18),
-      foregroundColor: c,
-      child: Text(student.name.isEmpty ? '?' : student.name[0].toUpperCase(),
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: radius * 0.8)),
-    );
+    if (!student.isCurrent) return avatar;
+    // green dot = currently active student
+    final dot = (radius * 0.55).clamp(10.0, 18.0);
+    return Stack(clipBehavior: Clip.none, children: [
+      avatar,
+      Positioned(
+        right: -1, bottom: -1,
+        child: Container(
+          width: dot, height: dot,
+          decoration: BoxDecoration(
+            color: AppColors.income,
+            shape: BoxShape.circle,
+            border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+          ),
+        ),
+      ),
+    ]);
   }
 }
 
@@ -50,6 +74,7 @@ class StudentsScreen extends ConsumerStatefulWidget {
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   String _q = '';
   bool _showAll = false; // false = current students only
+  String? _batch; // null = every batch
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
@@ -103,12 +128,63 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 );
               },
             ),
+            AnimatedBuilder(
+              animation: repo.studentsL,
+              builder: (context, _) {
+                final batches = repo.batchNames;
+                if (batches.isEmpty) return const SizedBox.shrink();
+                if (_batch != null && !batches.contains(_batch)) _batch = null;
+                return SizedBox(
+                  height: 42,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: const Text('All batches'),
+                          selected: _batch == null,
+                          onSelected: (_) => setState(() => _batch = null)),
+                      ),
+                      for (final b in batches)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            avatar: const Icon(Icons.groups_2_outlined, size: 16),
+                            label: Text(b),
+                            selected: _batch == b,
+                            onSelected: (_) => setState(() => _batch = _batch == b ? null : b)),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            if (_batch != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                child: PadCard(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => BatchDetailScreen(batch: _batch!))),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  child: Row(children: [
+                    const Icon(Icons.groups_2_outlined, color: AppColors.primary),
+                    Gap.m,
+                    Expanded(child: Text('Open batch · attendance, payments, members',
+                        style: const TextStyle(fontWeight: FontWeight.w600))),
+                    const Icon(Icons.chevron_right),
+                  ]),
+                ),
+              ),
             Expanded(
               child: AnimatedBuilder(
                 animation: Listenable.merge([repo.studentsL, repo.schedulesL, repo.logsL]),
                 builder: (context, _) {
                   final list = repo.studentList
-                      .where((s) => (_showAll || s.isCurrent) && s.name.toLowerCase().contains(_q))
+                      .where((s) => (_showAll || s.isCurrent) &&
+                          (_batch == null || s.batch == _batch) &&
+                          (s.name.toLowerCase().contains(_q) || s.batch.toLowerCase().contains(_q)))
                       .toList()
                     // in "All", current students first, previous ones after
                     ..sort((a, b) => a.isCurrent == b.isCurrent ? 0 : (a.isCurrent ? -1 : 1));
@@ -119,10 +195,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       message: _q.isNotEmpty
                           ? 'No match.'
                           : none
-                              ? 'No students yet.\nAdd your first student.'
+                              ? 'No students yet.\nTap Add to create a student or a batch.'
                               : 'No current students.\nOpen "All students" to see previous ones.',
-                      cta: _q.isEmpty ? 'Add Student' : null,
-                      onCta: () => context.push('/student-form'),
                     );
                   }
                   return ListView.separated(
@@ -157,6 +231,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                           ]),
                           Gap.m,
                           Wrap(spacing: 8, runSpacing: 6, children: [
+                            if (s.batch.isNotEmpty)
+                              GestureDetector(
+                                onTap: () => Navigator.push(context, MaterialPageRoute(
+                                    builder: (_) => BatchDetailScreen(batch: s.batch))),
+                                child: InfoChip(Icons.groups_2_outlined, s.batch, color: AppColors.primary)),
                             if (!s.isCurrent)
                               InfoChip(Icons.history,
                                   s.leftDate == null ? 'Previous' : 'Previous · left ${fullDate(s.leftDate!)}',
@@ -166,7 +245,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                               const SizedBox.shrink()
                             else if (next != null)
                               InfoChip(Icons.schedule,
-                                  'Next: ${weekdayNames[next.dayOfWeek]} ${minutesToTime(next.startMinutes)}',
+                                  'Next: ${weekdayNames[next.dayOfWeek]}${next.isDated ? ' ${shortDate(next.dateOn!)}' : ''} ${minutesToTime(next.startMinutes)}',
                                   color: AppColors.savings)
                             else
                               const InfoChip(Icons.schedule, 'No class set', color: AppColors.warning),
@@ -179,7 +258,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                           ],
                         ]),
                       );
-                      return s.isCurrent ? card : Opacity(opacity: 0.6, child: card);
+                      return card;
                     },
                   );
                 },
@@ -190,8 +269,29 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'addStudent',
-        onPressed: () => context.push('/student-form'),
-        icon: const Icon(Icons.person_add_alt),
+        onPressed: () => showModalBottomSheet(
+          context: context,
+          showDragHandle: true,
+          builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(
+              leading: const Icon(Icons.person_add_alt),
+              title: const Text('Add Student'),
+              subtitle: const Text('One student'),
+              onTap: () { Navigator.pop(ctx); context.push('/student-form'); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups_2_outlined),
+              title: const Text('Add Batch'),
+              subtitle: const Text('A group: shared fee, days & time, many students'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchFormScreen()));
+              },
+            ),
+            const SizedBox(height: 8),
+          ])),
+        ),
+        icon: const Icon(Icons.add),
         label: const Text('Add'),
       ),
     );
@@ -206,7 +306,139 @@ class StudentDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
-  late DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _monthSel; // cycle shown in the calendar/logs (null = current cycle)
+
+  /// Routine pictures linked to this student (added here or from the Routines screen).
+  Widget _routinesFor(BuildContext context, Repo repo, String sid) {
+    final list = repo.routinesFor(sid);
+    if (list.isEmpty) {
+      return const PadCard(child: Text('No routine picture. Tap Add to pick one from your gallery.'));
+    }
+    return SizedBox(
+      height: 130,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: list.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final r = list[i];
+          return GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => RoutineViewer(routine: r))),
+            onLongPress: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (c) => AlertDialog(
+                  title: Text('Delete "${r.title}"?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
+                  ],
+                ),
+              );
+              if (ok == true) await repo.deleteRoutine(r.id);
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Stack(children: [
+                Image.memory(base64Decode(r.image), width: 150, height: 130, fit: BoxFit.cover,
+                    gaplessPlayback: true),
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(
+                    color: Colors.black54,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(r.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Every billing month the student has been with you: classes, due, paid, status.
+  Widget _monthHistory(BuildContext context, WidgetRef ref, Repo repo, Student s, List<ClassLog> logs) {
+    var start = s.createdAt;
+    for (final l in logs) {
+      if (l.date.isBefore(start)) start = l.date;
+    }
+    if (s.billingStartDate != null) start = s.billingStartDate!;
+    final first = repo.cycleMonthOf(s, start);
+    final last = s.isCurrent
+        ? repo.currentCycleMonth(s)
+        : repo.cycleMonthOf(s, s.leftDate ?? DateTime.now());
+    final months = <DateTime>[];
+    for (var m = last; !m.isBefore(first) && months.length < 60; m = DateTime(m.year, m.month - 1)) {
+      months.add(m);
+    }
+    if (months.isEmpty) return const PadCard(child: Text('No months yet.'));
+    return PadCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(children: [
+        for (final m in months)
+          Builder(builder: (context) {
+            final st = repo.payState(s, m);
+            final classes = repo.classesInMonth(s, m);
+            final color = feeStatusColor(st.status);
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              onTap: () => showFeeSheet(context, ref, s, m),
+              title: Text(monthLabel(m), style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                  '$classes ${classes == 1 ? 'class' : 'classes'} · due ${taka(st.due)}'
+                  '${st.carry > 0.5 ? ' + ${taka(st.carry)} previous' : ''} · paid ${taka(st.paid)}'
+                  '${s.billingDay != 1 ? '\n${cycleLabel(repo, s, m)}' : ''}'),
+              isThreeLine: s.billingDay != 1,
+              trailing: Chip(
+                label: Text(feeStatusLabel(st.status),
+                    style: const TextStyle(color: Colors.white, fontSize: 11)),
+                backgroundColor: color, visualDensity: VisualDensity.compact),
+            );
+          }),
+      ]),
+    );
+  }
+
+  /// Weekly timetable summary + every class already booked for a date.
+  Widget _scheduledFor(BuildContext context, WidgetRef ref, Repo repo, Student s) {
+    final mine = repo.scheduleList.where((e) => e.studentId == s.id).toList();
+    final weekly = mine.where((e) => !e.isDated).toList()
+      ..sort((a, b) => a.dayOfWeek != b.dayOfWeek
+          ? a.dayOfWeek.compareTo(b.dayOfWeek)
+          : a.startMinutes.compareTo(b.startMinutes));
+    final dated = repo.datedUpcoming.where((e) => e.studentId == s.id).toList();
+    if (weekly.isEmpty && dated.isEmpty) {
+      return const PadCard(child: Text('No classes scheduled. Tap Add to book dates.'));
+    }
+    Widget row(IconData icon, String title, ScheduleItem it) => ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon, color: AppColors.savings, size: 20),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text('${minutesToTime(it.startMinutes)} · ${it.durationMin} min'),
+          onTap: () => openScheduleSheet(context, ref, existing: it),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            onPressed: () => repo.deleteSchedule(it.id)),
+        );
+    return PadCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (weekly.isNotEmpty) ...[
+        const Text('Every week', style: TextStyle(fontWeight: FontWeight.w700)),
+        for (final it in weekly) row(Icons.repeat, weekdayNames[it.dayOfWeek], it),
+      ],
+      if (dated.isNotEmpty) ...[
+        if (weekly.isNotEmpty) const Divider(),
+        const Text('Booked dates', style: TextStyle(fontWeight: FontWeight.w700)),
+        for (final it in dated)
+          row(Icons.event, '${weekdayNames[it.dateOn!.weekday - 1]}, ${fullDate(it.dateOn!)}', it),
+      ],
+    ]));
+  }
 
   Widget _examCard(Repo repo, Exam e, {bool taken = false}) {
     final days = e.date.difference(DateTime.now()).inDays;
@@ -237,8 +469,12 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                 e.questionReady ? 'Q ready' : 'Q pending',
               ].join(' · '), style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
               if (e.syllabus.isNotEmpty)
-                Text('Syllabus: ${e.syllabus}',
+                Text(e.syllabus,
                     style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+              if (e.subjects.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ExamSyllabusView(exam: e),
+              ],
             ]),
           ),
         ]),
@@ -253,7 +489,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     return Scaffold(
       body: SafeArea(
         child: AnimatedBuilder(
-          animation: Listenable.merge([repo.studentsL, repo.logsL, repo.paymentsL, repo.examsL]),
+          animation: Listenable.merge([repo.studentsL, repo.logsL, repo.paymentsL, repo.examsL, repo.schedulesL, repo.absencesL, repo.routinesL]),
           builder: (context, _) {
             final s = repo.student(id);
             if (s == null) {
@@ -263,15 +499,20 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             final last = repo.lastLog(id);
             final exams = repo.examsFor(id);
             final taughtKeys = logs.map((l) => dateKey(l.date)).toSet();
+            final month = _monthSel ?? repo.currentCycleMonth(s);
+            final cStart = repo.cycleStart(s, month), cEnd = repo.cycleEnd(s, month);
+            final cycleName = s.billingDay == 1
+                ? monthLabel(month)
+                : '${shortDate(cStart)} – ${shortDate(cEnd)}';
             final monthLogs = logs
-                .where((l) => l.date.year == _month.year && l.date.month == _month.month)
+                .where((l) => !l.date.isBefore(cStart) && !l.date.isAfter(cEnd))
                 .toList();
-            final monthExams = exams
-                .where((e) => e.date.year == _month.year && e.date.month == _month.month)
-                .toList();
-            final m = monthKey(DateTime.now());
-            final pay = repo.paymentFor(id, m);
-            final paid = pay?.status == 'paid';
+            final cycle = repo.currentCycleMonth(s);
+            final fee = repo.payState(s, cycle);
+            final totalReceived = repo.paymentList
+                .where((p) => p.studentId == id)
+                .fold(0.0, (sum, p) => sum + p.paid);
+            final paid = fee.status == 'paid';
             return CustomScrollView(slivers: [
               SliverAppBar(
                 pinned: true,
@@ -309,24 +550,44 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     Gap.m,
                     Row(children: [
                       const Icon(Icons.payments, size: 18), const SizedBox(width: 6),
-                      Text('Fee ${taka(s.monthlyFee)}/mo'),
-                      if (s.classesPerMonth > 0) ...[const SizedBox(width: 14),
+                      Text(s.payPerClass ? 'Fee ${taka(s.monthlyFee)}/class' : 'Fee ${taka(s.monthlyFee)}/mo'),
+                      if (s.payPerClass) ...[const SizedBox(width: 14),
+                        const Icon(Icons.event_repeat, size: 16), const SizedBox(width: 4),
+                        const Text('Per day')]
+                      else if (s.classesPerMonth > 0) ...[const SizedBox(width: 14),
                         const Icon(Icons.event_repeat, size: 16), const SizedBox(width: 4),
                         Text('${s.classesPerMonth}/month')],
                     ]),
+                    if (s.billingDay != 1) ...[Gap.s, Row(children: [
+                      const Icon(Icons.today, size: 16), const SizedBox(width: 6),
+                      Text('Month starts on the ${s.billingDay}${_ord(s.billingDay)}'),
+                    ])],
                     if (s.days.isNotEmpty) ...[Gap.s, Row(children: [
                       const Icon(Icons.calendar_view_week, size: 16, color: AppColors.savings),
                       const SizedBox(width: 6),
                       Expanded(child: Text('Days: ${weekdayNames.where((d) => s.days.contains(d)).join(', ')}',
                           style: const TextStyle(fontWeight: FontWeight.w600))),
                     ])],
-                    if (s.guardianPhone.isNotEmpty) ...[Gap.s, _PhoneRow(label: 'Guardian', phone: s.guardianPhone)],
+                    for (final g in s.guardians.where((g) => g.phone.isNotEmpty)) ...[
+                      Gap.s,
+                      _PhoneRow(
+                        label: [
+                          g.relation.isNotEmpty ? g.relation : 'Guardian',
+                          if (g.name.isNotEmpty) g.name,
+                        ].join(' · '),
+                        phone: g.phone),
+                    ],
                     if (s.phone.isNotEmpty) ...[Gap.s, _PhoneRow(label: 'Student', phone: s.phone)],
-                    for (final p in s.extraPhones) ...[Gap.s, _PhoneRow(label: 'Other', phone: p)],
+                    for (final p in s.extraPhones) ...[Gap.s, _PhoneRow(label: 'Student', phone: p)],
                     Gap.m,
                     Wrap(spacing: 8, runSpacing: 6, children: [
-                      InfoChip(Icons.calendar_month, '${monthLogs.length} in ${monthLabel(_month)}', color: AppColors.income),
+                      InfoChip(Icons.calendar_month, '${monthLogs.length} in $cycleName', color: AppColors.income),
                       InfoChip(Icons.menu_book, 'Total: ${logs.length} classes', color: AppColors.primary),
+                    ]),
+                    Gap.s,
+                    Wrap(spacing: 8, runSpacing: 6, children: [
+                      InfoChip(Icons.hourglass_bottom, _studyingFor(s, logs), color: AppColors.savings),
+                      InfoChip(Icons.payments, 'Received ${taka(totalReceived)}', color: AppColors.income),
                     ]),
                   ])),
                   Gap.l,
@@ -336,18 +597,27 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       icon: const Icon(Icons.edit_note), label: const Text('Log Class'))),
                     Gap.m,
                     Expanded(child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                          backgroundColor: paid ? AppColors.income : AppColors.warning),
-                      onPressed: () async {
-                        if (paid) {
-                          await repo.markFeeUnpaid(pay!);
-                        } else {
-                          await repo.markFeePaid(s, DateTime.now());
-                        }
-                      },
+                      style: FilledButton.styleFrom(backgroundColor: feeStatusColor(fee.status)),
+                      onPressed: () => showFeeSheet(context, ref, s, cycle),
                       icon: Icon(paid ? Icons.check_circle : Icons.attach_money),
-                      label: Text(paid ? 'Fee Paid' : 'Mark Paid'))),
+                      label: Text(paid ? 'Fee Paid' : fee.status == 'partial' ? 'Partial' : 'Collect Fee'))),
                   ]),
+                  Gap.l,
+                  SectionTitle('Routine pictures', icon: Icons.photo_library_outlined, color: AppColors.savings,
+                      trailing: TextButton.icon(
+                          onPressed: () => addRoutineFromGallery(context, ref, studentId: id),
+                          icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+                          label: const Text('Add'))),
+                  _routinesFor(context, repo, id),
+                  Gap.l,
+                  const SectionTitle('Month by month', icon: Icons.calendar_month, color: AppColors.primary),
+                  _monthHistory(context, ref, repo, s, logs),
+                  Gap.l,
+                  SectionTitle('Scheduled classes', icon: Icons.event_available, color: AppColors.savings,
+                      trailing: TextButton.icon(
+                          onPressed: () => openScheduleSheet(context, ref, presetStudentId: id),
+                          icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
+                  _scheduledFor(context, ref, repo, s),
                   Gap.l,
                   const SectionTitle('Last Class Summary'),
                   PadCard(child: last == null
@@ -364,8 +634,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   SectionTitle('Attendance Calendar', icon: Icons.event_available, color: AppColors.income),
                   _TaughtCalendar(
                     taughtKeys: taughtKeys,
-                    month: _month,
-                    onMonthChanged: (mo) => setState(() => _month = mo),
+                    absentKeys: repo.absencesFor(id).map((a) => a.date).toSet(),
+                    start: cStart,
+                    end: cEnd,
+                    label: cycleName,
+                    onShift: (dir) => setState(() => _monthSel = DateTime(month.year, month.month + dir)),
                     onTapDay: (day) {
                       final match = logs.where((l) => dateKey(l.date) == dateKey(day)).toList();
                       if (match.isNotEmpty) {
@@ -377,7 +650,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 4, left: 4),
-                    child: Text('Tap a day to add/edit · use ‹ › to change month (logs & exams follow)',
+                    child: Text('Tap a day to add/edit · use ‹ › to change month (logs follow)',
                         style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
                   ),
                   Gap.l,
@@ -385,14 +658,15 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       trailing: TextButton.icon(
                           onPressed: () => showExamSheet(context, studentId: id),
                           icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
-                  if (monthExams.where((e) => !e.done).isEmpty)
-                    const PadCard(child: Text('No upcoming exams this month.'))
+                  if (exams.where((e) => !e.done).isEmpty)
+                    const PadCard(child: Text('No upcoming exams. Tap Add to create one.'))
                   else
-                    ...monthExams.where((e) => !e.done).map((e) => _examCard(repo, e)),
-                  if (monthExams.any((e) => e.done)) ...[
+                    ...exams.where((e) => !e.done).map((e) => _examCard(repo, e)),
+                  if (exams.any((e) => e.done)) ...[
                     Gap.l,
                     SectionTitle('Taken exams', icon: Icons.history, color: AppColors.income),
-                    ...monthExams.where((e) => e.done).map((e) => _examCard(repo, e, taken: true)),
+                    ...(exams.where((e) => e.done).toList()..sort((a, b) => b.date.compareTo(a.date)))
+                        .map((e) => _examCard(repo, e, taken: true)),
                   ],
                   Gap.l,
                   SectionTitle('Class Logs (${monthLogs.length})'),
@@ -432,6 +706,22 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
   }
 }
 
+/// Editable controllers for one guardian row in the student form.
+class _GuardianEntry {
+  _GuardianEntry([Guardian? g])
+      : name = TextEditingController(text: g?.name ?? ''),
+        phone = TextEditingController(text: g?.phone ?? ''),
+        relation = TextEditingController(text: g?.relation ?? '');
+  final TextEditingController name, phone, relation;
+  Guardian get value => Guardian(
+      name: name.text.trim(), phone: phone.text.trim(), relation: relation.text.trim());
+  void dispose() {
+    name.dispose();
+    phone.dispose();
+    relation.dispose();
+  }
+}
+
 class StudentFormScreen extends ConsumerStatefulWidget {
   const StudentFormScreen({super.key, this.id});
   final String? id;
@@ -445,17 +735,38 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
     'HSC 1st Year', 'HSC 2nd Year', 'Admission', 'Honors', 'Other',
   ];
   static const _subjectPreset = [
-    'Bangla', 'English', 'Math', 'Higher Math', 'Physics', 'Chemistry',
-    'Biology', 'ICT', 'GK', 'Accounting', 'Economics', 'General Science',
+    'Math', 'Higher Math', 'Physics', 'Chemistry', 'ICT',
   ];
   static const _perMonthOptions = [4, 8, 12, 16, 20, 24, 30];
+  DateTime? _billingStart; // picked "month starts on" date
+  bool _payPerClass = false;
+
+  Future<void> _customPerMonth() async {
+    final c = TextEditingController(text: '$_perMonth');
+    final n = await showDialog<int>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Classes per month'),
+      content: TextField(controller: c, autofocus: true, keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(hintText: 'e.g. 10')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            final v = int.tryParse(c.text.trim()) ?? 0;
+            Navigator.pop(ctx, v > 0 && v <= 60 ? v : null);
+          },
+          child: const Text('Set')),
+      ],
+    ));
+    if (n != null) setState(() => _perMonth = n);
+  }
 
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _institution = TextEditingController();
   final _fee = TextEditingController();
-  final _guardian = TextEditingController();
-  final _guardianPhone = TextEditingController();
+  final _batch = TextEditingController();
+  final List<_GuardianEntry> _guardians = [];
   final List<TextEditingController> _extraPhones = [];
 
   String? _grade;
@@ -482,15 +793,19 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
         _current = s.isCurrent;
         _name.text = s.name;
         _phone.text = s.phone;
+        _batch.text = s.batch;
         _institution.text = s.institution;
         _fee.text = s.monthlyFee == 0 ? '' : s.monthlyFee.toStringAsFixed(0);
-        _guardian.text = s.guardianName;
-        _guardianPhone.text = s.guardianPhone;
+        for (final g in s.guardians) {
+          _guardians.add(_GuardianEntry(g));
+        }
         for (final p in s.extraPhones) {
           _extraPhones.add(TextEditingController(text: p));
         }
         _photo = s.photo;
         _perMonth = s.classesPerMonth == 0 ? 8 : s.classesPerMonth;
+        _billingStart = s.billingStartDate;
+        _payPerClass = s.payPerClass;
         _defaultTime = TimeOfDay(hour: s.defaultTimeMinutes ~/ 60, minute: s.defaultTimeMinutes % 60);
         _colorValue = s.colorValue;
         _days.addAll(s.days);
@@ -504,6 +819,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
         }
       }
     }
+    if (_guardians.isEmpty) _guardians.add(_GuardianEntry());
   }
 
   Future<void> _save() async {
@@ -520,6 +836,9 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       institution: _institution.text.trim(),
       monthlyFee: double.tryParse(_fee.text.trim()) ?? 0,
       classesPerMonth: _perMonth,
+      billingDay: _billingStart?.day ?? 1,
+      billingStart: _billingStart == null ? '' : dateKey(_billingStart!),
+      payPerClass: _payPerClass,
       defaultTimeMinutes: _defaultTime.hour * 60 + _defaultTime.minute,
       colorValue: _colorValue,
       photo: _photo,
@@ -527,9 +846,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
       days: weekdayNames.where((d) => _days.contains(d)).toList(),
       weakSubjects: const [],
       extraPhones: _extraPhones.map((c) => c.text.trim()).where((x) => x.isNotEmpty).toList(),
-      guardianName: _guardian.text.trim(),
-      guardianPhone: _guardianPhone.text.trim(),
-      batch: _existing?.batch ?? '',
+      guardians: _guardians.map((g) => g.value).where((g) => !g.isEmpty).toList(),
+      batch: _batch.text.trim(),
       status: _current ? 'active' : 'previous',
       leftOn: _current
           ? ''
@@ -593,15 +911,65 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           ),
           Gap.m,
           _text(_institution, 'Institution'),
+          Gap.m,
+          _text(_batch, 'Batch (optional)'),
+          if (ref.read(repoProvider).batchNames.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Wrap(spacing: 6, runSpacing: 0, children: [
+                for (final b in ref.read(repoProvider).batchNames)
+                  ActionChip(
+                    label: Text(b),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onPressed: () => setState(() => _batch.text = b)),
+              ]),
+            ),
           Gap.l,
           _chips('Subjects', _subjects),
           Gap.l,
           DropdownButtonFormField<int>(
-            initialValue: _perMonth,
+            key: ValueKey(_payPerClass),
+            initialValue: _payPerClass ? -2 : _perMonth,
             decoration: const InputDecoration(labelText: 'Classes per month'),
-            items: _perMonthOptions.map((n) =>
-                DropdownMenuItem(value: n, child: Text('$n classes / month'))).toList(),
-            onChanged: (v) => setState(() => _perMonth = v ?? 8),
+            items: [
+              ...({..._perMonthOptions, _perMonth}.toList()..sort()).map((n) =>
+                  DropdownMenuItem(value: n, child: Text('$n classes / month'))),
+              const DropdownMenuItem(value: -1, child: Text('Custom…')),
+              const DropdownMenuItem(value: -2, child: Text('Per day (pay per class)')),
+            ],
+            onChanged: (v) {
+              if (v == -1) {
+                _customPerMonth();
+              } else if (v == -2) {
+                setState(() => _payPerClass = true);
+              } else {
+                setState(() { _payPerClass = false; _perMonth = v ?? 8; });
+              }
+            },
+          ),
+          Gap.m,
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event_repeat),
+            title: const Text('Month starts on'),
+            subtitle: Text(_billingStart == null
+                ? '1st of every month (calendar month)'
+                : '${fullDate(_billingStart!)} · every month from the ${_billingStart!.day}${_ord(_billingStart!.day)}'),
+            trailing: _billingStart == null
+                ? const Icon(Icons.calendar_today, size: 20)
+                : IconButton(
+                    tooltip: 'Use calendar month',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() => _billingStart = null)),
+            onTap: () async {
+              final d = await showDatePicker(
+                  context: context,
+                  initialDate: _billingStart ?? DateTime.now(),
+                  firstDate: DateTime(2020), lastDate: DateTime(2100),
+                  helpText: 'Pick the day this student\'s month starts');
+              if (d != null) setState(() => _billingStart = DateTime(d.year, d.month, d.day));
+            },
           ),
           Gap.s,
           ListTile(
@@ -618,29 +986,69 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           const Align(alignment: Alignment.centerLeft,
               child: Text('Class days', style: TextStyle(fontWeight: FontWeight.w600))),
           Gap.s,
-          Wrap(spacing: 8, runSpacing: 8, children: weekdayNames.map((d) => FilterChip(
-                label: Text(d),
-                selected: _days.contains(d),
-                onSelected: (v) => setState(() => v ? _days.add(d) : _days.remove(d)),
-              )).toList()),
+          // all seven days in a single row
+          Row(children: weekdayNames.map((d) => Expanded(child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: FilterChip(
+                  label: SizedBox(width: double.infinity,
+                      child: Text(d, textAlign: TextAlign.center, maxLines: 1,
+                          style: const TextStyle(fontSize: 12))),
+                  labelPadding: EdgeInsets.zero,
+                  padding: EdgeInsets.zero,
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  selected: _days.contains(d),
+                  onSelected: (v) => setState(() => v ? _days.add(d) : _days.remove(d)),
+                ),
+              ))).toList()),
           Gap.m,
           const Text('Card colour', style: TextStyle(fontWeight: FontWeight.w600)),
           Gap.s,
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            _swatch(0),
-            ...AppColors.palette.map((c) => _swatch(c.toARGB32(), color: c)),
-          ]),
+          _colorGrid(),
           Gap.m,
-          _text(_fee, 'Monthly fee (৳)', number: true),
+          _text(_fee, _payPerClass ? 'Fee per class (৳)' : 'Monthly fee (৳)', number: true),
           Gap.m,
-          _text(_phone, 'Student phone', number: true),
+          _text(_phone, 'Student phone', number: true,
+              onPickContact: () => _pickContact(_phone, nameTo: _name)),
           Gap.m,
-          _text(_guardian, 'Guardian name'),
-          Gap.m,
-          _text(_guardianPhone, 'Guardian phone', number: true),
+          for (var i = 0; i < _guardians.length; i++) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.fromLTRB(12, 4, 4, 12),
+              decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Column(children: [
+                Row(children: [
+                  Text('Guardian ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Remove guardian',
+                    icon: const Icon(Icons.remove_circle_outline, color: AppColors.expense),
+                    onPressed: () => setState(() => _guardians.removeAt(i).dispose())),
+                ]),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Column(children: [
+                    _text(_guardians[i].name, 'Name'),
+                    Gap.s,
+                    _text(_guardians[i].relation, 'Relation (Father, Mother…)'),
+                    Gap.s,
+                    _text(_guardians[i].phone, 'Phone', number: true,
+                        onPickContact: () => _pickContact(_guardians[i].phone, nameTo: _guardians[i].name)),
+                  ]),
+                ),
+              ]),
+            ),
+          ],
+          Align(alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _guardians.add(_GuardianEntry())),
+              icon: const Icon(Icons.add), label: const Text('Add guardian'))),
           Gap.m,
           const Align(alignment: Alignment.centerLeft,
-              child: Text('Other numbers', style: TextStyle(fontWeight: FontWeight.w600))),
+              child: Text('More student numbers', style: TextStyle(fontWeight: FontWeight.w600))),
           for (var i = 0; i < _extraPhones.length; i++)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -649,7 +1057,12 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
                   controller: _extraPhones[i],
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.+ ]'))],
-                  decoration: const InputDecoration(labelText: 'Number'))),
+                  decoration: InputDecoration(
+                    labelText: 'Number',
+                    suffixIcon: IconButton(
+                      tooltip: 'Pick from contacts',
+                      icon: const Icon(Icons.contacts_outlined),
+                      onPressed: () => _pickContact(_extraPhones[i]))))),
                 IconButton(
                     icon: const Icon(Icons.remove_circle_outline, color: AppColors.expense),
                     onPressed: () => setState(() => _extraPhones.removeAt(i))),
@@ -658,7 +1071,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           Align(alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => setState(() => _extraPhones.add(TextEditingController())),
-              icon: const Icon(Icons.add), label: const Text('Add number'))),
+              icon: const Icon(Icons.add), label: const Text('Add student number'))),
           Gap.l,
           FilledButton(onPressed: _save, child: const Text('Save Student')),
         ]),
@@ -703,29 +1116,182 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
     }
   }
 
-  Widget _text(TextEditingController c, String label, {bool number = false}) => TextField(
+  /// Pick a phone number from the device contacts (no permission needed:
+  /// the system picker returns only the chosen contact). Fills [nameTo] when empty.
+  Future<void> _pickContact(TextEditingController phone, {TextEditingController? nameTo}) async {
+    try {
+      final c = await FlutterNativeContactPicker().selectPhoneNumber();
+      final number = (c?.selectedPhoneNumber ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
+      if (number.isEmpty) return;
+      setState(() {
+        phone.text = number;
+        if (nameTo != null && nameTo.text.trim().isEmpty) nameTo.text = c?.fullName ?? '';
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open contacts')));
+      }
+    }
+  }
+
+  Widget _text(TextEditingController c, String label,
+          {bool number = false, VoidCallback? onPickContact}) =>
+      TextField(
         controller: c,
         keyboardType: number ? TextInputType.number : TextInputType.text,
         inputFormatters: number ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.+ ]'))] : null,
-        decoration: InputDecoration(labelText: label),
+        decoration: InputDecoration(
+          labelText: label,
+          suffixIcon: onPickContact == null
+              ? null
+              : IconButton(
+                  tooltip: 'Pick from contacts',
+                  icon: const Icon(Icons.contacts_outlined),
+                  onPressed: onPickContact),
+        ),
       );
 
-  Widget _swatch(int val, {Color? color}) {
-    final sel = _colorValue == val;
+  /// Built-in card colours (13 + the custom picker = two full rows of 7).
+  static const _cardColors = <Color>[
+    Color(0xFF6366F1), Color(0xFF10B981), Color(0xFFF43F5E), Color(0xFFF59E0B),
+    Color(0xFF3B82F6), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6),
+    Color(0xFFF97316), Color(0xFF06B6D4), Color(0xFF84CC16), Color(0xFF0EA5E9),
+    Color(0xFFB45309),
+  ];
+
+  Widget _colorGrid() {
+    final cells = <Widget>[
+      _customSwatch(),
+      for (final c in _cardColors) _swatch(c),
+    ];
+    return Column(children: [
+      for (var r = 0; r < cells.length; r += 7)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(children: [
+            for (var k = r; k < r + 7; k++)
+              Expanded(child: Center(child: k < cells.length ? cells[k] : const SizedBox())),
+          ]),
+        ),
+    ]);
+  }
+
+  bool get _isCustomColor =>
+      _colorValue != 0 && !_cardColors.any((c) => c.toARGB32() == _colorValue);
+
+  /// First swatch: opens the colour picker. Shows the chosen custom colour once set.
+  Widget _customSwatch() {
+    final custom = _isCustomColor ? Color(_colorValue) : null;
     return GestureDetector(
-      onTap: () => setState(() => _colorValue = val),
+      onTap: () async {
+        final c = await showDialog<Color>(
+            context: context,
+            builder: (_) => _ColorPickerDialog(initial: custom ?? _cardColors.first));
+        if (c != null) setState(() => _colorValue = c.toARGB32());
+      },
       child: Container(
         width: 38, height: 38,
         decoration: BoxDecoration(
-          color: color ?? Theme.of(context).colorScheme.surfaceContainerHighest,
           shape: BoxShape.circle,
-          border: Border.all(color: sel ? (color ?? AppColors.primary) : Colors.transparent, width: 3),
+          gradient: custom == null
+              ? const SweepGradient(colors: [
+                  Colors.red, Colors.yellow, Colors.green, Colors.cyan,
+                  Colors.blue, Colors.purple, Colors.red])
+              : null,
+          color: custom,
+          border: Border.all(color: custom != null ? Colors.white : Colors.transparent, width: 3),
+          boxShadow: custom != null ? [BoxShadow(color: custom, blurRadius: 0, spreadRadius: 1)] : null,
         ),
         alignment: Alignment.center,
-        child: color == null
-            ? const Icon(Icons.auto_awesome, size: 16)
-            : (sel ? const Icon(Icons.check, color: Colors.white, size: 18) : null),
+        child: Icon(custom == null ? Icons.colorize : Icons.check, size: 18, color: Colors.white),
       ),
+    );
+  }
+
+  Widget _swatch(Color color) {
+    final val = color.toARGB32();
+    final sel = _colorValue == val;
+    return GestureDetector(
+      // tap the selected colour again to go back to automatic
+      onTap: () => setState(() => _colorValue = sel ? 0 : val),
+      child: Container(
+        width: 38, height: 38,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: sel ? Colors.white : Colors.transparent, width: 3),
+          boxShadow: sel ? [BoxShadow(color: color, blurRadius: 0, spreadRadius: 1)] : null,
+        ),
+        alignment: Alignment.center,
+        child: sel ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+      ),
+    );
+  }
+}
+
+/// Simple colour picker: hue / saturation / brightness sliders + hex code.
+class _ColorPickerDialog extends StatefulWidget {
+  const _ColorPickerDialog({required this.initial});
+  final Color initial;
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  late HSVColor _hsv = HSVColor.fromColor(widget.initial);
+  late final _hex = TextEditingController(text: _hexOf(widget.initial));
+
+  static String _hexOf(Color c) =>
+      (c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+
+  void _set(HSVColor h) {
+    setState(() => _hsv = h);
+    _hex.text = _hexOf(h.toColor());
+  }
+
+  @override
+  void dispose() {
+    _hex.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _hsv.toColor();
+    return AlertDialog(
+      title: const Text('Custom colour'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(height: 56, decoration: BoxDecoration(
+            color: color, borderRadius: BorderRadius.circular(12))),
+        const SizedBox(height: 8),
+        Slider(
+          value: _hsv.hue, min: 0, max: 360,
+          activeColor: HSVColor.fromAHSV(1, _hsv.hue, 1, 1).toColor(),
+          onChanged: (v) => _set(_hsv.withHue(v))),
+        Slider(
+          value: _hsv.saturation, min: 0, max: 1,
+          onChanged: (v) => _set(_hsv.withSaturation(v))),
+        Slider(
+          value: _hsv.value, min: 0, max: 1,
+          onChanged: (v) => _set(_hsv.withValue(v))),
+        TextField(
+          controller: _hex,
+          maxLength: 6,
+          textCapitalization: TextCapitalization.characters,
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9a-fA-F]'))],
+          decoration: const InputDecoration(prefixText: '# ', labelText: 'Hex code', counterText: ''),
+          onChanged: (v) {
+            if (v.length == 6) {
+              setState(() => _hsv = HSVColor.fromColor(Color(0xFF000000 | int.parse(v, radix: 16))));
+            }
+          },
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, color), child: const Text('Use')),
+      ],
     );
   }
 }
@@ -803,108 +1369,119 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
     final subjOpts = (_studentId == null ? null : repo.student(_studentId!))?.subjects ?? const <String>[];
     final editing = widget.existing != null;
     return Scaffold(
-      appBar: AppBar(title: Text(editing ? 'Edit Class Log' : 'Log Class')),
+      appBar: AppBar(title: Text(editing ? 'Edit Class Log' : 'Log Class'), toolbarHeight: 48),
       body: SafeArea(
-        child: ListView(padding: const EdgeInsets.all(16), children: [
+        child: ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), children: [
           DropdownButtonFormField<String>(
             initialValue: _studentId,
-            decoration: const InputDecoration(labelText: 'Student'),
+            isDense: true,
+            decoration: const InputDecoration(labelText: 'Student', isDense: true),
             items: students.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
             onChanged: (v) => setState(() => _studentId = v),
           ),
-          Gap.m,
+          const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Date'),
-              subtitle: Text(fullDate(_date)),
-              trailing: const Icon(Icons.calendar_today, size: 20),
-              onTap: () async {
+            Expanded(child: OutlinedButton.icon(
+              icon: const Icon(Icons.calendar_today, size: 16),
+              label: Text(fullDate(_date)),
+              onPressed: () async {
                 final d = await showDatePicker(context: context, initialDate: _date,
                     firstDate: DateTime(2020), lastDate: DateTime(2100));
                 if (d != null) setState(() => _date = d);
               },
             )),
-            Expanded(child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Time'),
-              subtitle: Text(_time.format(context)),
-              trailing: const Icon(Icons.access_time, size: 20),
-              onTap: () async {
+            const SizedBox(width: 8),
+            Expanded(child: OutlinedButton.icon(
+              icon: const Icon(Icons.access_time, size: 16),
+              label: Text(_time.format(context)),
+              onPressed: () async {
                 final t = await showTimePicker(context: context, initialTime: _time);
                 if (t != null) setState(() => _time = t);
               },
             )),
           ]),
-          Gap.s,
+          const SizedBox(height: 6),
           if (subjOpts.isNotEmpty) ...[
-            const Align(alignment: Alignment.centerLeft,
-                child: Text('Subjects taught', style: TextStyle(fontWeight: FontWeight.w600))),
-            const SizedBox(height: 6),
-            Wrap(spacing: 8, runSpacing: 6, children: subjOpts.map((s) => FilterChip(
+            Wrap(spacing: 6, runSpacing: 0, children: subjOpts.map((s) => FilterChip(
                   label: Text(s), selected: _logSubjects.contains(s),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   onSelected: (v) => setState(() => v ? _logSubjects.add(s) : _logSubjects.remove(s)),
                 )).toList()),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
           ],
-          _field(_topics, 'Today covered (topics)', lines: 2),
-          const Align(alignment: Alignment.centerLeft,
-              child: Text('Homework', style: TextStyle(fontWeight: FontWeight.w600))),
-          const SizedBox(height: 6),
-          Wrap(spacing: 8, runSpacing: 6, children: [
+          _field(_topics, 'Today covered (topics)'),
+          Wrap(spacing: 6, runSpacing: 0, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            const Text('Homework:', style: TextStyle(fontWeight: FontWeight.w600)),
             for (final h in const ['MCQ', 'CQ', 'Exercise', 'Page', 'Practice', 'Memorize', 'Worksheet'])
               FilterChip(
                 label: Text(h),
                 selected: _hwTypes.contains(h),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 onSelected: (v) => setState(() => v ? _hwTypes.add(h) : _hwTypes.remove(h))),
           ]),
-          const SizedBox(height: 6),
-          _field(_homework, 'Homework details (e.g. page 29-48)', lines: 2),
-          _field(_learned, 'What student learned / could do', lines: 2),
-          _field(_notDone, 'Not done / weak points', lines: 2),
-          _field(_nextPlan, 'Next class plan', lines: 2),
-          Gap.s,
-          Text('Performance: ${_perf.round()}/10', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Slider(value: _perf, min: 0, max: 10, divisions: 10,
-              label: '${_perf.round()}', onChanged: (v) => setState(() => _perf = v)),
+          const SizedBox(height: 8),
+          _field(_homework, 'Homework details (e.g. page 29-48)'),
+          _field(_learned, 'What student learned / could do'),
+          _field(_notDone, 'Not done / weak points'),
+          _field(_nextPlan, 'Next class plan'),
+          Row(children: [
+            Text('Performance ${_perf.round()}/10', style: const TextStyle(fontWeight: FontWeight.w600)),
+            Expanded(child: Slider(value: _perf, min: 0, max: 10, divisions: 10,
+                label: '${_perf.round()}', onChanged: (v) => setState(() => _perf = v))),
+          ]),
           _field(_remarks, "Today's comment"),
-          Gap.l,
-          FilledButton(onPressed: _save, child: Text(editing ? 'Update Log' : 'Save Log')),
         ]),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+          child: FilledButton(onPressed: _save, child: Text(editing ? 'Update Log' : 'Save Log')),
+        ),
       ),
     );
   }
 
-  Widget _field(TextEditingController c, String label, {int lines = 1}) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, maxLines: lines,
-            decoration: InputDecoration(labelText: label)),
+  /// Compact field: one line that grows up to 3 as you type.
+  Widget _field(TextEditingController c, String label) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: TextField(controller: c, minLines: 1, maxLines: 3,
+            decoration: InputDecoration(labelText: label, isDense: true)),
       );
 }
 
 /// Month calendar that highlights days a class was logged (green).
 class _TaughtCalendar extends StatelessWidget {
-  const _TaughtCalendar({required this.taughtKeys, required this.month, this.onMonthChanged, this.onTapDay});
+  const _TaughtCalendar({
+    required this.taughtKeys, required this.start, required this.end,
+    required this.label, this.onShift, this.onTapDay, this.absentKeys = const {}});
   final Set<String> taughtKeys;
-  final DateTime month;
-  final void Function(DateTime)? onMonthChanged;
+  final Set<String> absentKeys; // days missed (batch attendance)
+  final DateTime start, end; // the student's billing month (e.g. 17 Mar – 16 Apr)
+  final String label;
+  final void Function(int)? onShift;
   final void Function(DateTime)? onTapDay;
 
   @override
   Widget build(BuildContext context) {
-    final first = DateTime(month.year, month.month, 1);
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final offset = first.weekday - 1; // Monday = 0
+    final offset = start.weekday - 1; // Monday = 0
     final todayKey = dateKey(DateTime.now());
-    final monthCount = taughtKeys.where((k) => k.startsWith(monthKey(month))).length;
+    final days = <DateTime>[];
+    for (var d = DateTime(start.year, start.month, start.day);
+        !d.isAfter(end);
+        d = DateTime(d.year, d.month, d.day + 1)) {
+      days.add(d);
+    }
+    final count = days.where((d) => taughtKeys.contains(dateKey(d))).length;
 
     final cells = <Widget>[
       for (var i = 0; i < offset; i++) const SizedBox(),
     ];
-    for (var d = 1; d <= daysInMonth; d++) {
-      final date = DateTime(month.year, month.month, d);
+    for (final date in days) {
       final key = dateKey(date);
       final taught = taughtKeys.contains(key);
+      final absent = absentKeys.contains(key) && !taught;
       final isToday = key == todayKey;
       cells.add(GestureDetector(
         onTap: () => onTapDay?.call(date),
@@ -912,13 +1489,13 @@ class _TaughtCalendar extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: taught ? AppColors.income : Colors.transparent,
+            color: taught ? AppColors.income : (absent ? AppColors.expense : Colors.transparent),
             shape: BoxShape.circle,
             border: isToday ? Border.all(color: AppColors.primary, width: 1.5) : null,
           ),
           alignment: Alignment.center,
-          child: Text('$d', style: TextStyle(
-            color: taught ? Colors.white : null,
+          child: Text('${date.day}', style: TextStyle(
+            color: (taught || absent) ? Colors.white : null,
             fontWeight: taught ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
           )),
@@ -929,14 +1506,10 @@ class _TaughtCalendar extends StatelessWidget {
     return PadCard(
       child: Column(children: [
         Row(children: [
-          IconButton(
-              onPressed: () => onMonthChanged?.call(DateTime(month.year, month.month - 1)),
-              icon: const Icon(Icons.chevron_left)),
-          Expanded(child: Text(monthLabel(month), textAlign: TextAlign.center,
+          IconButton(onPressed: () => onShift?.call(-1), icon: const Icon(Icons.chevron_left)),
+          Expanded(child: Text(label, textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.w700))),
-          IconButton(
-              onPressed: () => onMonthChanged?.call(DateTime(month.year, month.month + 1)),
-              icon: const Icon(Icons.chevron_right)),
+          IconButton(onPressed: () => onShift?.call(1), icon: const Icon(Icons.chevron_right)),
         ]),
         Row(children: weekdayNames
             .map((w) => Expanded(child: Center(child: Text(w,
@@ -954,8 +1527,15 @@ class _TaughtCalendar extends StatelessWidget {
           Container(width: 12, height: 12,
               decoration: const BoxDecoration(color: AppColors.income, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          Text('Taught $monthCount ${monthCount == 1 ? 'day' : 'days'} in ${monthLabel(month)}',
+          Text('Taught $count ${count == 1 ? 'day' : 'days'} · $label',
               style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (days.any((d) => absentKeys.contains(dateKey(d)) && !taughtKeys.contains(dateKey(d)))) ...[
+            const SizedBox(width: 10),
+            Container(width: 12, height: 12,
+                decoration: const BoxDecoration(color: AppColors.expense, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+            const Text('Absent'),
+          ],
         ]),
       ]),
     );
@@ -1026,4 +1606,27 @@ Future<void> setStudentCurrent(BuildContext context, WidgetRef ref, Student s, b
       action: SnackBarAction(
           label: 'UNDO', textColor: AppColors.primary, onPressed: () => repo.saveStudent(s)),
     ));
+}
+
+String _ord(int n) => (n % 100 >= 11 && n % 100 <= 13)
+    ? 'th'
+    : switch (n % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', _ => 'th' };
+
+/// "Studying 3 mo 12 d (104 days)" — from the first class (or when the student was
+/// added) up to today, or up to the day they left.
+String _studyingFor(Student s, List<ClassLog> logs) {
+  var start = s.createdAt;
+  for (final l in logs) {
+    if (l.date.isBefore(start)) start = l.date;
+  }
+  final end = s.isCurrent ? DateTime.now() : (s.leftDate ?? DateTime.now());
+  final a = DateTime(start.year, start.month, start.day);
+  final b = DateTime(end.year, end.month, end.day);
+  final days = b.difference(a).inDays;
+  if (days < 0) return 'Started ${fullDate(a)}';
+  var months = (b.year - a.year) * 12 + b.month - a.month;
+  if (b.day < a.day) months--;
+  final rest = b.difference(DateTime(a.year, a.month + months, a.day)).inDays;
+  final span = months > 0 ? '$months mo $rest d' : '$days d';
+  return '${s.isCurrent ? 'Studying' : 'Studied'} $span ($days days)';
 }

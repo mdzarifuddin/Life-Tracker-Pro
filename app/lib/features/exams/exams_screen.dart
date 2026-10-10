@@ -63,8 +63,12 @@ class ExamsScreen extends ConsumerWidget {
                       ].join(' · '), style: TextStyle(color: Theme.of(context).hintColor, fontSize: 13)),
                       if (e.syllabus.isNotEmpty) ...[
                         const SizedBox(height: 2),
-                        Text('Syllabus: ${e.syllabus}',
+                        Text(e.syllabus,
                             style: TextStyle(color: Theme.of(context).hintColor, fontSize: 13)),
+                      ],
+                      if (e.subjects.isNotEmpty) ...[
+                        Gap.s,
+                        ExamSyllabusView(exam: e),
                       ],
                       Gap.s,
                       InfoChip(
@@ -85,6 +89,62 @@ class ExamsScreen extends ConsumerWidget {
         icon: const Icon(Icons.add), label: const Text('Exam'),
       ),
     );
+  }
+}
+
+/// Per-subject syllabus: progress, and tappable topics (tap = covered / not yet).
+class ExamSyllabusView extends ConsumerWidget {
+  const ExamSyllabusView({super.key, required this.exam});
+  final Exam exam;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(repoProvider);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      for (var si = 0; si < exam.subjects.length; si++) ...[
+        Builder(builder: (context) {
+          final sub = exam.subjects[si];
+          final total = sub.topics.length;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text(sub.name, style: const TextStyle(fontWeight: FontWeight.w700))),
+                Text(total == 0 ? 'no syllabus' : '${sub.doneCount}/$total done · ${sub.leftCount} left',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: total > 0 && sub.leftCount == 0 ? AppColors.income : AppColors.warning,
+                        fontWeight: FontWeight.w600)),
+              ]),
+              if (total > 0) ...[
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: sub.doneCount / total, minHeight: 5,
+                    color: AppColors.income,
+                    backgroundColor: AppColors.income.withValues(alpha: 0.15)),
+                ),
+                const SizedBox(height: 6),
+                Wrap(spacing: 6, runSpacing: 0, children: [
+                  for (var ti = 0; ti < total; ti++)
+                    FilterChip(
+                      label: Text(sub.topics[ti].title, style: const TextStyle(fontSize: 12)),
+                      selected: sub.topics[ti].done,
+                      showCheckmark: true,
+                      checkmarkColor: AppColors.income,
+                      selectedColor: AppColors.income.withValues(alpha: 0.18),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onSelected: (_) => repo.saveExam(exam.withTopicToggled(si, ti)),
+                    ),
+                ]),
+              ],
+            ]),
+          );
+        }),
+      ],
+    ]);
   }
 }
 
@@ -110,12 +170,11 @@ class _ExamSheet extends ConsumerStatefulWidget {
 class _ExamSheetState extends ConsumerState<_ExamSheet> {
   static const _commonSubjects = [
     'Bangla', 'English', 'Math', 'Higher Math', 'Physics', 'Chemistry',
-    'Biology', 'ICT', 'GK', 'Accounting', 'Economics', 'General Science',
+    'Biology', 'ICT', 'General Science',
   ];
   final _title = TextEditingController();
-  final _syllabus = TextEditingController();
-  String? _subject;
-  late final List<String> _subjectOpts = [..._commonSubjects];
+  final _notes = TextEditingController();
+  final _subjects = <_SubjectDraft>[];
   String _type = 'Monthly Test';
   String? _studentId;
   DateTime _date = DateTime.now().add(const Duration(days: 7));
@@ -129,9 +188,10 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
     final e = widget.existing;
     if (e != null) {
       _title.text = e.title;
-      _subject = e.subject.isEmpty ? null : e.subject;
-      if (e.subject.isNotEmpty && !_subjectOpts.contains(e.subject)) _subjectOpts.add(e.subject);
-      _syllabus.text = e.syllabus;
+      for (final s in e.subjects) {
+        _subjects.add(_SubjectDraft(s.name, [...s.topics]));
+      }
+      _notes.text = e.syllabus;
       _type = e.examType.isEmpty ? 'Monthly Test' : e.examType;
       _studentId = e.studentId.isEmpty ? null : e.studentId;
       _date = e.date;
@@ -141,6 +201,16 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
     } else {
       _studentId = widget.presetStudentId;
     }
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _notes.dispose();
+    for (final s in _subjects) {
+      s.input.dispose();
+    }
+    super.dispose();
   }
 
   Future<String?> _askCustom() {
@@ -156,12 +226,45 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
     ));
   }
 
+  Future<void> _addSubject() async {
+    final taken = _subjects.map((s) => s.name).toSet();
+    final repoStudent = _studentId == null ? null : ref.read(repoProvider).student(_studentId!);
+    final options = <String>{...?repoStudent?.subjects, ..._commonSubjects}
+        .where((n) => !taken.contains(n)).toList();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(child: ListView(shrinkWrap: true, children: [
+        for (final n in options) ListTile(title: Text(n), onTap: () => Navigator.pop(ctx, n)),
+        ListTile(
+          leading: const Icon(Icons.add), title: const Text('Custom…'),
+          onTap: () => Navigator.pop(ctx, '__custom__')),
+      ])),
+    );
+    if (picked == null) return;
+    final name = picked == '__custom__' ? await _askCustom() : picked;
+    if (name == null || name.isEmpty || taken.contains(name)) return;
+    setState(() => _subjects.add(_SubjectDraft(name, [])));
+  }
+
+  void _addTopics(_SubjectDraft sub) {
+    // comma / new-line separated, so several can be typed at once
+    final parts = sub.input.text.split(RegExp(r'[,\n]')).map((t) => t.trim()).where((t) => t.isNotEmpty);
+    if (parts.isEmpty) return;
+    setState(() {
+      for (final p in parts) {
+        if (!sub.topics.any((t) => t.title == p)) sub.topics.add(SyllabusTopic(p));
+      }
+      sub.input.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
     final students = repo.pickableStudents(_studentId);
     final editing = widget.existing != null;
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Text(editing ? 'Edit Exam' : 'Add Exam',
@@ -171,25 +274,13 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
         TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title (e.g. HSC Model Test)')),
         Gap.s,
         DropdownButtonFormField<String>(
-          initialValue: _subject,
-          decoration: const InputDecoration(labelText: 'Subject'),
+          initialValue: _studentId,
+          decoration: const InputDecoration(labelText: 'Student (optional)'),
           items: [
-            ..._subjectOpts.map((s) => DropdownMenuItem(value: s, child: Text(s))),
-            const DropdownMenuItem(value: '__custom__', child: Text('➕ Custom…')),
+            const DropdownMenuItem(value: null, child: Text('— none —')),
+            ...students.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
           ],
-          onChanged: (v) async {
-            if (v == '__custom__') {
-              final name = await _askCustom();
-              if (name != null && name.isNotEmpty) {
-                setState(() {
-                  if (!_subjectOpts.contains(name)) _subjectOpts.add(name);
-                  _subject = name;
-                });
-              }
-            } else {
-              setState(() => _subject = v);
-            }
-          },
+          onChanged: (v) => setState(() => _studentId = v),
         ),
         Gap.s,
         DropdownButtonFormField<String>(
@@ -198,16 +289,6 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
           items: const ['SSC', 'HSC', 'Monthly Test', 'Pre-Test', 'Model Test']
               .map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
           onChanged: (v) => setState(() => _type = v ?? 'Monthly Test'),
-        ),
-        Gap.s,
-        DropdownButtonFormField<String>(
-          initialValue: _studentId,
-          decoration: const InputDecoration(labelText: 'Student (optional)'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('— none —')),
-            ...students.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))),
-          ],
-          onChanged: (v) => setState(() => _studentId = v),
         ),
         Row(children: [
           Expanded(child: ListTile(
@@ -230,8 +311,60 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
             },
           )),
         ]),
-        TextField(controller: _syllabus, maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Syllabus')),
+        Row(children: [
+          const Expanded(child: Text('Subjects & syllabus', style: TextStyle(fontWeight: FontWeight.w700))),
+          TextButton.icon(
+            onPressed: _addSubject,
+            icon: const Icon(Icons.add, size: 18), label: const Text('Subject')),
+        ]),
+        if (_subjects.isEmpty)
+          Text('Add each subject and list its syllabus topics to track what is done and left.',
+              style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12.5)),
+        for (final sub in _subjects)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 10),
+            decoration: BoxDecoration(
+                border: Border.all(color: Theme.of(context).dividerColor),
+                borderRadius: BorderRadius.circular(12)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Text(sub.name, style: const TextStyle(fontWeight: FontWeight.w700))),
+                Text('${sub.topics.where((t) => t.done).length}/${sub.topics.length} done',
+                    style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+                IconButton(
+                  tooltip: 'Remove subject',
+                  icon: const Icon(Icons.remove_circle_outline, color: AppColors.expense, size: 20),
+                  onPressed: () => setState(() => _subjects.remove(sub))),
+              ]),
+              Wrap(spacing: 6, runSpacing: 0, children: [
+                for (var i = 0; i < sub.topics.length; i++)
+                  InputChip(
+                    label: Text(sub.topics[i].title, style: const TextStyle(fontSize: 12)),
+                    selected: sub.topics[i].done,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onSelected: (_) => setState(() => sub.topics[i] = sub.topics[i].toggled()),
+                    onDeleted: () => setState(() => sub.topics.removeAt(i)),
+                  ),
+              ]),
+              Padding(
+                padding: const EdgeInsets.only(right: 8, top: 4),
+                child: TextField(
+                  controller: sub.input,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Add topics (comma separated)',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.add), onPressed: () => _addTopics(sub))),
+                  onSubmitted: (_) => _addTopics(sub),
+                ),
+              ),
+            ]),
+          ),
+        Gap.s,
+        TextField(controller: _notes, maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Other notes (optional)')),
         Gap.s,
         DropdownButtonFormField<int>(
           initialValue: _duration,
@@ -257,13 +390,16 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
         FilledButton(
           onPressed: () async {
             if (_title.text.trim().isEmpty) return;
+            for (final s in _subjects) {
+              _addTopics(s); // pick up text typed but not added yet
+            }
             final dt = DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
             await ref.read(repoProvider).saveExam(Exam(
               id: widget.existing?.id ?? newId(),
               title: _title.text.trim(),
               examType: _type, studentId: _studentId ?? '', date: dt,
-              subject: _subject ?? '',
-              syllabus: _syllabus.text.trim(), questionReady: _questionReady,
+              subjects: _subjects.map((s) => ExamSubject(s.name, [...s.topics])).toList(),
+              syllabus: _notes.text.trim(), questionReady: _questionReady,
               durationMin: _duration, done: widget.existing?.done ?? false,
             ));
             if (context.mounted) Navigator.pop(context);
@@ -274,4 +410,11 @@ class _ExamSheetState extends ConsumerState<_ExamSheet> {
       ]),
     );
   }
+}
+
+class _SubjectDraft {
+  _SubjectDraft(this.name, this.topics);
+  final String name;
+  final List<SyllabusTopic> topics;
+  final input = TextEditingController();
 }
