@@ -175,7 +175,7 @@ class _BatchDetailScreenState extends ConsumerState<BatchDetailScreen> {
                 Expanded(child: GradientStatCard(label: 'Collected', value: taka(collected),
                     gradient: AppColors.incomeGrad, icon: Icons.check_circle)),
                 Gap.m,
-                Expanded(child: GradientStatCard(label: 'Pending', value: taka(pending),
+                Expanded(child: GradientStatCard(label: 'Due', value: taka(pending),
                     gradient: AppColors.warningGrad, icon: Icons.schedule)),
               ]),
               Gap.m,

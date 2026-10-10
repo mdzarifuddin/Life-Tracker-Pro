@@ -24,7 +24,7 @@ Color feeStatusColor(String status) => status == 'paid'
     : status == 'partial' ? AppColors.warning : AppColors.expense;
 
 String feeStatusLabel(String status) =>
-    status == 'paid' ? 'Paid' : status == 'partial' ? 'Partial' : 'Pending';
+    status == 'paid' ? 'Paid' : status == 'partial' ? 'Partial' : 'Due';
 
 String cycleLabel(Repo repo, Student s, DateTime month) =>
     '${fullDate(repo.cycleStart(s, month))} – ${fullDate(repo.cycleEnd(s, month))}';
@@ -102,6 +102,8 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
     final id = await repo.addPayment(widget.student, widget.month, amount, _date, classes: classes);
     messenger.showSnackBar(SnackBar(
       content: Text('${taka(amount)} marked paid'),
+      persist: false,
+      duration: const Duration(seconds: 4),
       action: SnackBarAction(label: 'UNDO', onPressed: () {
         final p = repo.paymentFor(widget.student.id, monthKey(widget.month));
         if (p != null && p.installments.any((i) => i.id == id)) repo.removeInstallment(p, id);
@@ -298,7 +300,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 Row(children: [
                   Expanded(child: GradientStatCard(label: 'Collected', value: taka(collected), gradient: AppColors.incomeGrad, icon: Icons.check_circle)),
                   Gap.m,
-                  Expanded(child: GradientStatCard(label: 'Pending', value: taka(pending), gradient: AppColors.warningGrad, icon: Icons.schedule)),
+                  Expanded(child: GradientStatCard(label: 'Due', value: taka(pending), gradient: AppColors.warningGrad, icon: Icons.schedule)),
                 ]),
                 Gap.l,
                 if (visible.isEmpty)
