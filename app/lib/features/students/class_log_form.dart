@@ -73,7 +73,14 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
     final subjOpts = (_studentId == null ? null : repo.student(_studentId!))?.subjects ?? const <String>[];
     final editing = widget.existing != null;
     return Scaffold(
-      appBar: AppBar(title: Text(editing ? 'Edit Class Log' : 'Log Class'), toolbarHeight: 48),
+      appBar: AppBar(title: Text(editing ? 'Edit Class Log' : 'Log Class'), toolbarHeight: 48, actions: [
+        if (!editing)
+          TextButton.icon(
+            onPressed: () => showBulkClassesSheet(context, repo),
+            icon: const Icon(Icons.playlist_add, size: 20),
+            label: const Text('Add many'),
+          ),
+      ]),
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), children: [
           DropdownButtonFormField<String>(

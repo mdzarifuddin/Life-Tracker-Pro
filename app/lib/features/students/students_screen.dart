@@ -1,5 +1,6 @@
 ﻿import 'dart:convert';
 
+import 'bulk_classes_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -550,6 +551,28 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   SizedBox(width: double.infinity, child: FilledButton.tonalIcon(
                     onPressed: () => context.push('/class-log', extra: id),
                     icon: const Icon(Icons.edit_note), label: const Text('Log Class'))),
+                  Gap.s,
+                  Builder(builder: (context) {
+                    final a = repo.feeAccount(s);
+                    final over = a.isOverdue;
+                    return PadCard(
+                      onTap: () => context.push('/student-fees/$id'),
+                      child: Row(children: [
+                        Icon(Icons.account_balance_wallet_outlined,
+                            color: a.owed > 0.5 ? (over ? AppColors.expense : AppColors.warning) : AppColors.income),
+                        Gap.m,
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Fees', style: TextStyle(fontWeight: FontWeight.w700)),
+                          Text(
+                            a.owed > 0.5
+                                ? (over ? 'Owes ${taka(a.owed)} · overdue ${a.overdueDays}d' : 'Owes ${taka(a.owed)}')
+                                : a.credit > 0.5 ? 'Advance ${taka(a.credit)}' : 'All clear',
+                            style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12.5)),
+                        ])),
+                        const Icon(Icons.chevron_right),
+                      ]),
+                    );
+                  }),
                   Gap.l,
                   SectionTitle('Routine pictures', icon: Icons.photo_library_outlined, color: AppColors.savings,
                       trailing: TextButton.icon(

@@ -124,7 +124,11 @@ class _BatchDetailScreenState extends ConsumerState<BatchDetailScreen> {
       if (v != null) await repo.setCustomDue(s, month, v);
     } else {
       final v = double.tryParse(c.text.trim());
-      if (v != null) await repo.saveStudent(Student.fromMap({...s.toMap(), 'monthlyFee': v}));
+      // A new fee plan from this month: earlier months keep the fee they had.
+      if (v != null) {
+        final last = s.plans.last;
+        await repo.setPlan(s, last.copyWith(id: newId(), from: monthKey(month), amount: v));
+      }
     }
   }
 
