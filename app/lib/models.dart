@@ -17,6 +17,21 @@ class Absence {
         id: _s(m['id']), studentId: _s(m['studentId']), date: _s(m['date']), batch: _s(m['batch']));
 }
 
+/// A weekly time a student is NOT available (school, private tutor, etc.).
+class BusyTime {
+  final String id, studentId, label;
+  final List<int> days; // 0 = Monday .. 6 = Sunday
+  final int startMinutes, endMinutes;
+  BusyTime({required this.id, required this.studentId, this.label = '',
+      this.days = const [], required this.startMinutes, required this.endMinutes});
+  Map<String, dynamic> toMap() => {'id': id, 'studentId': studentId, 'label': label,
+        'days': days, 'startMinutes': startMinutes, 'endMinutes': endMinutes};
+  factory BusyTime.fromMap(Map m) => BusyTime(
+        id: _s(m['id']), studentId: _s(m['studentId']), label: _s(m['label']),
+        days: m['days'] is List ? (m['days'] as List).map(_i).toList() : const [],
+        startMinutes: _i(m['startMinutes']), endMinutes: _i(m['endMinutes']));
+}
+
 /// A routine picture (class/exam timetable…) stored as base64.
 class Routine {
   final String id, title, image;
@@ -127,7 +142,7 @@ class Student {
         subjects: _ls(m['subjects']), weakSubjects: _ls(m['weakSubjects']),
         extraPhones: _ls(m['extraPhones']), days: _ls(m['days']),
         guardians: m['guardians'] is List
-            ? (m['guardians'] as List).map((g) => Guardian.fromMap(g as Map)).toList()
+            ? (m['guardians'] as List).whereType<Map>().map(Guardian.fromMap).toList()
             : (_s(m['guardianName']).isEmpty && _s(m['guardianPhone']).isEmpty
                 ? const <Guardian>[]
                 : [Guardian(name: _s(m['guardianName']), phone: _s(m['guardianPhone']))]),
@@ -274,7 +289,7 @@ class Payment {
   factory Payment.fromMap(Map m) {
     final raw = m['installments'];
     var inst = raw is List
-        ? raw.map((e) => PayInstallment.fromMap(e as Map)).toList()
+        ? raw.whereType<Map>().map(PayInstallment.fromMap).toList()
         : <PayInstallment>[];
     // Legacy single "mark paid" record.
     if (raw is! List && _d(m['paidAmount']) > 0) {
@@ -380,7 +395,7 @@ class ExamSubject {
   factory ExamSubject.fromMap(Map m) => ExamSubject(
         _s(m['name']),
         m['topics'] is List
-            ? (m['topics'] as List).map((t) => SyllabusTopic.fromMap(t as Map)).toList()
+            ? (m['topics'] as List).whereType<Map>().map(SyllabusTopic.fromMap).toList()
             : const [],
       );
 }
@@ -419,7 +434,7 @@ class Exam {
     List<ExamSubject> subs;
     var notes = _s(m['syllabus']);
     if (m['subjects'] is List) {
-      subs = (m['subjects'] as List).map((s) => ExamSubject.fromMap(s as Map)).toList();
+      subs = (m['subjects'] as List).whereType<Map>().map(ExamSubject.fromMap).toList();
     } else if (_s(m['subject']).isNotEmpty) {
       // older single-subject exam: its syllabus text becomes the topic list
       final topics = notes

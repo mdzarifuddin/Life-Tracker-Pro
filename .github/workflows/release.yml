@@ -27,6 +27,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Require signing secrets
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then echo "KEYSTORE_BASE64 secret is missing; refusing to build a debug-signed release"; exit 1; fi
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/android/app/upload-keystore.jks
 
@@ -43,6 +47,8 @@ jobs:
         working-directory: app
         run: |
           flutter pub get
+          flutter analyze
+          flutter test
           flutter build apk --release
 
       - name: Publish GitHub Release

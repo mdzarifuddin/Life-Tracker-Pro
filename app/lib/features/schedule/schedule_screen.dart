@@ -325,6 +325,29 @@ class _ScheduleSheetState extends ConsumerState<_ScheduleSheet> {
               return;
             }
             final repo = ref.read(repoProvider);
+            if (!_isPersonal) {
+              final start = _time.hour * 60 + _time.minute;
+              final days = _weekly ? [_day] : _dates.map((d) => d.weekday - 1).toSet().toList();
+              for (final d in days) {
+                final clash = repo.busyClash(_studentId!, d, start, start + _duration);
+                if (clash == null) continue;
+                final go = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Student is busy'),
+                    content: Text('${clash.label.isEmpty ? 'Busy' : clash.label}: '
+                        '${weekdayNames[d]} ${minutesToTime(clash.startMinutes)} – ${minutesToTime(clash.endMinutes)}.\n\nSave this class anyway?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Change time')),
+                      FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save anyway')),
+                    ],
+                  ),
+                );
+                if (go != true) return;
+                break;
+              }
+              if (!context.mounted) return;
+            }
             ScheduleItem build(String id, int day, String onDate) => ScheduleItem(
                   id: id,
                   studentId: _isPersonal ? '' : _studentId!,

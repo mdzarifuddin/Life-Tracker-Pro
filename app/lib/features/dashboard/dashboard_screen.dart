@@ -13,6 +13,21 @@ import '../../models.dart';
 import '../schedule/schedule_screen.dart';
 import '../tasks/tasks_screen.dart';
 
+/// Friendly empty state: soft icon + one line.
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+  @override
+  Widget build(BuildContext context) => PadCard(
+        child: Row(children: [
+          Icon(icon, color: Theme.of(context).hintColor),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: TextStyle(color: Theme.of(context).hintColor))),
+        ]),
+      );
+}
+
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -99,7 +114,7 @@ class DashboardScreen extends ConsumerWidget {
                     icon: Icons.calendar_today, color: AppColors.savings,
                     trailing: TextButton(onPressed: () => context.go('/schedule'), child: const Text('All'))),
                 if (todays.isEmpty)
-                  const PadCard(child: Text('No classes scheduled today. Enjoy! 🎉'))
+                  const _EmptyHint(icon: Icons.celebration_outlined, text: 'No classes today. Enjoy your day!')
                 else
                   GridView.count(
                     crossAxisCount: 2,
@@ -193,7 +208,7 @@ class DashboardScreen extends ConsumerWidget {
                     icon: Icons.event, color: AppColors.warning,
                     trailing: TextButton(onPressed: () => context.go('/more/exams'), child: const Text('All'))),
                 if (repo.upcomingExams.isEmpty)
-                  const PadCard(child: Text('No upcoming exams.'))
+                  const _EmptyHint(icon: Icons.event_available_outlined, text: 'No upcoming exams.')
                 else
                   ...repo.upcomingExams.take(3).map((e) {
                     final days = e.date.difference(DateTime.now()).inDays;
