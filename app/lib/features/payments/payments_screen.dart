@@ -232,7 +232,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: PadCard(
         padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-        onTap: () => context.push('/student-fees/${s.id}'),
+        onTap: () => showCollectSheet(context, ref, s, month: worst?.month),
         child: Column(children: [
           Row(children: [
             InitialAvatar(s.name),
@@ -248,26 +248,6 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               StatusPill(pillText, pillColor),
             ]),
           ]),
-          if (a.owed > 0.5)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(children: [
-                Expanded(child: FilledButton.tonalIcon(
-                  icon: const Icon(Icons.payments, size: 18),
-                  label: const Text('Collect'),
-                  onPressed: () => showCollectSheet(context, ref, s, month: worst?.month),
-                )),
-                Gap.s,
-                Expanded(child: GestureDetector(
-                  onLongPress: () => sendFeeReminder(context, repo, s, a, sms: true),
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.chat, size: 18),
-                    label: const Text('Remind'),
-                    onPressed: () => sendFeeReminder(context, repo, s, a),
-                  ),
-                )),
-              ]),
-            ),
         ]),
       ),
     );
