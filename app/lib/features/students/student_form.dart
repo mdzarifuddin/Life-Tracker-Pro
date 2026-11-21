@@ -122,7 +122,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           const SnackBar(content: Text('Name is required')));
       return;
     }
-    final s0 = Student(
+    final s = Student(
       id: widget.id ?? newId(),
       name: _name.text.trim(),
       phone: _phone.text.trim(),
@@ -149,24 +149,6 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
               ? _existing!.leftOn
               : DateTime.now().toIso8601String().substring(0, 10),
     );
-    var s = s0;
-    final old = _existing;
-    if (old != null && old.feePlans.isNotEmpty) {
-      // Keep the fee plan history. If the basic fee fields were changed here, apply
-      // that to the latest plan only, so earlier months keep their old fee.
-      final changed = old.monthlyFee != s0.monthlyFee ||
-          old.classesPerMonth != s0.classesPerMonth ||
-          old.payPerClass != s0.payPerClass;
-      final plans = [...old.feePlans];
-      if (changed) {
-        final last = plans.removeLast();
-        final kind = s0.payPerClass ? FeePlan.perClass : FeePlan.monthly;
-        plans.add(last.copyWith(
-            kind: kind, amount: s0.monthlyFee,
-            classesPerCycle: kind == FeePlan.monthly ? s0.classesPerMonth : 0));
-      }
-      s = s0.withPlans(plans);
-    }
     await ref.read(repoProvider).saveStudent(s);
     if (mounted) context.pop();
   }
@@ -320,15 +302,6 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           _colorGrid(),
           Gap.m,
           _text(_fee, _payPerClass ? 'Fee per class (৳)' : 'Monthly fee (৳)', number: true),
-          if (_existing != null)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.tune),
-              title: const Text('Fee plan, discount, due date'),
-              subtitle: const Text('Package plans, scholarships, late fee, fee changes from a month'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/student-fees/${_existing!.id}'),
-            ),
           Gap.m,
           _text(_phone, 'Student phone', number: true,
               onPickContact: () => _pickContact(_phone, nameTo: _name)),

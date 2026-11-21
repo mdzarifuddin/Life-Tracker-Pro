@@ -44,13 +44,21 @@ class _BulkSheetState extends State<_BulkSheet> {
     if (_busy) return;
     setState(() => _busy = true);
     var n = 0;
+    // A new student starts from their earliest class, so past months show them too.
+    final firstOf = <String, DateTime>{};
+    for (final e in entries.where((e) => e.student == null && e.days.isNotEmpty)) {
+      final d = DateTime(e.year, e.month, e.days.first);
+      final k = e.name.toLowerCase();
+      if (firstOf[k] == null || d.isBefore(firstOf[k]!)) firstOf[k] = d;
+    }
     final created = <String, Student>{}; // new students made from this text, by lowercase name
     for (final e in entries) {
       var st = e.student;
       if (st == null && _create && e.days.isNotEmpty) {
         st = created[e.name.toLowerCase()];
         if (st == null) {
-          st = Student(id: newId(), name: e.name);
+          final first = firstOf[e.name.toLowerCase()] ?? DateTime.now();
+          st = Student(id: '${first.microsecondsSinceEpoch}_${newId().split('_').last}', name: e.name);
           await widget.repo.saveStudent(st);
           created[e.name.toLowerCase()] = st;
         }

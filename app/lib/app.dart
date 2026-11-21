@@ -17,8 +17,6 @@ import 'features/jobprep/jobprep_screen.dart';
 import 'features/thesis/thesis_screen.dart';
 import 'features/lists/lists_screen.dart';
 import 'features/settings/settings_screen.dart';
-import 'features/payments/ledger_screen.dart';
-import 'features/payments/fee_settings_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -68,16 +66,6 @@ final _router = GoRouter(
           ),
         ]),
       ],
-    ),
-    GoRoute(
-      path: '/student-fees/:id',
-      parentNavigatorKey: _rootKey,
-      builder: (c, s) => LedgerScreen(id: s.pathParameters['id']!),
-    ),
-    GoRoute(
-      path: '/fee-settings',
-      parentNavigatorKey: _rootKey,
-      builder: (c, s) => const FeeSettingsScreen(),
     ),
     GoRoute(
       path: '/student-form',

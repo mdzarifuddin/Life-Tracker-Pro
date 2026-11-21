@@ -5,7 +5,6 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
-import 'fees.dart';
 import 'theme.dart';
 
 String newId() =>
@@ -228,8 +227,13 @@ class Repo {
   }
 
   /// Fee due for a month = per-class rate × classes taught (flat fee if classes/month unset).
-  double dueForMonth(Student s, DateTime month) =>
-      feeAccount(s, through: month).statementFor(monthKey(month))?.base ?? 0;
+  double dueForMonth(Student s, DateTime month) {
+    final custom = paymentFor(s.id, monthKey(month))?.customDue;
+    if (custom != null) return custom; // fee set by hand for this month
+    if (s.payPerClass) return s.monthlyFee * classesInMonth(s, month);
+    if (s.classesPerMonth <= 0) return s.monthlyFee;
+    return (s.monthlyFee / s.classesPerMonth) * classesInMonth(s, month);
+  }
 
   /// The soonest upcoming class for a student (weekly or booked for a date).
   ScheduleItem? nextClassFor(String sid) => _nextClass(sid)?.$1;
@@ -595,51 +599,42 @@ class Repo {
   Future<void> saveItem(ListItem i) => listitems.put(i.id, i.toMap());
   Future<void> deleteItem(String id) => listitems.delete(id);
 
-  // ---- fees (the maths lives in core/fees.dart) ----
-  static FeeSettings? _feeCfg;
-
-  /// All fee customisation (methods, due day, late fee, receipt/reminder text…).
-  FeeSettings get feeSettings => _feeCfg ??= () {
-        final raw = settings.get('feeSettings');
-        return raw is Map ? FeeSettings.fromMap(raw) : const FeeSettings();
-      }();
-  set feeSettings(FeeSettings v) {
-    _feeCfg = v;
-    settings.put('feeSettings', v.toMap());
-  }
-
-  /// Full fee account of a student: every cycle, balance, overdue amount, ledger.
-  /// [through] also computes cycles up to that month (e.g. when browsing a later month).
-  FeeAccount feeAccount(Student s, {DateTime? through, DateTime? today}) => computeFeeAccount(
-        s: s,
-        classDates: _logsBySid[s.id]?.map((l) => l.date).toList() ?? const [],
-        records: {for (final p in paymentsOf(s.id)) p.month: p},
-        cfg: feeSettings,
-        today: today ?? DateTime.now(),
-        through: through,
-      );
-
-  /// Students that appear in the fee inbox: current ones, plus previous ones who still owe.
-  List<(Student, FeeAccount)> feeInbox({DateTime? today}) {
-    final out = <(Student, FeeAccount)>[];
-    for (final s in studentList) {
-      final a = feeAccount(s, today: today);
-      if (s.isCurrent || a.balance > 0.5) out.add((s, a));
-    }
-    return out;
-  }
-
-  /// Fee position for the cycle starting in [month] (same shape as before fee plans):
-  ///  - [due]: this cycle's own bill
-  ///  - [carry]: what was left unpaid (or paid in advance, if negative) in all earlier cycles
+  /// Fee position for the cycle starting in [month].
+  ///  - [due]: this month's own fee
+  ///  - [carry]: what was left unpaid (or paid in advance, if negative) in all earlier months
   ///  - [total]: carry + due, what is payable now
-  ///  - [paid]: paid toward this cycle
-  /// Unpaid or part-paid cycles roll into the next one automatically.
+  ///  - [paid]: paid in this month's sheet
+  /// Unpaid or part-paid months therefore roll into the next month automatically.
   ({double due, double paid, double carry, double total, double remaining, String status})
       payState(Student s, DateTime month) {
-    final c = feeAccount(s, through: month).statementFor(monthKey(month));
-    if (c == null) return (due: 0, paid: 0, carry: 0, total: 0, remaining: 0, status: 'pending');
-    final due = c.net, paid = c.paid, carry = c.opening;
+    final dates = logsFor(s.id).map((l) => l.date).toList();
+    final pays = <String, Payment>{
+      for (final p in paymentsOf(s.id)) p.month: p,
+    };
+    double dueOf(DateTime m) {
+      final custom = pays[monthKey(m)]?.customDue;
+      if (custom != null) return custom;
+      final a = cycleStart(s, m), b = cycleEnd(s, m);
+      final n = dates.where((d) => !d.isBefore(a) && !d.isAfter(b)).length;
+      if (s.payPerClass) return s.monthlyFee * n;
+      if (s.classesPerMonth <= 0) return s.monthlyFee;
+      return s.monthlyFee / s.classesPerMonth * n;
+    }
+
+    var start = s.createdAt;
+    for (final d in dates) {
+      if (d.isBefore(start)) start = d;
+    }
+    final bs = s.billingStartDate;
+    if (bs != null) start = bs;
+    var carry = 0.0;
+    var n = 0;
+    for (var m = cycleMonthOf(s, start); m.isBefore(month) && n < 120;
+        m = DateTime(m.year, m.month + 1), n++) {
+      carry += dueOf(m) - (pays[monthKey(m)]?.paid ?? 0);
+    }
+    final due = dueOf(month);
+    final paid = pays[monthKey(month)]?.paid ?? 0;
     final total = carry + due;
     final left = total - paid;
     final remaining = left < 0 ? 0.0 : left;
@@ -649,32 +644,21 @@ class Repo {
     return (due: due, paid: paid, carry: carry, total: total, remaining: remaining, status: status);
   }
 
-  int _nextReceiptNo() {
-    final n = ((settings.get('feeReceiptSeq') as int?) ?? 0) + 1;
-    settings.put('feeReceiptSeq', n);
-    return n;
-  }
-
-  /// Reads the cycle's record (or starts a new one), applies [change] and saves it.
-  Future<void> _changeCycle(Student s, DateTime month, Payment Function(Payment) change) {
-    final mk = monthKey(month);
-    final old = paymentFor(s.id, mk) ?? Payment(id: newId(), studentId: s.id, month: mk);
-    return _savePayment(change(old), s, month);
-  }
-
   /// Record a full or partial payment on [date]. It stays in the student's records only:
-  /// nothing is added to Finance. Returns the id of the new payment so it can be undone.
+  /// nothing is added to Finance.
+  /// Returns the id of the new payment so it can be undone.
   Future<String> addPayment(Student s, DateTime month, double amount, DateTime date,
-      {int classes = 0, String method = '', String ref = '', String note = ''}) async {
-    final inst = PayInstallment(id: newId(), amount: amount, date: date, classes: classes,
-        method: method, ref: ref, note: note, receiptNo: _nextReceiptNo());
-    await _changeCycle(s, month, (p) => p.copyWith(installments: [...p.installments, inst]));
+      {int classes = 0}) async {
+    final mk = monthKey(month);
+    final old = paymentFor(s.id, mk);
+    final inst = PayInstallment(id: newId(), amount: amount, date: date, txnId: '', account: '', classes: classes);
+    await _savePayment(Payment(
+      id: old?.id ?? newId(), studentId: s.id, month: mk, amount: dueForMonth(s, month),
+      installments: [...?old?.installments, inst],
+      customDue: old?.customDue,
+    ), s, month);
     return inst.id;
   }
-
-  /// Puts back a payment that was removed (Undo), keeping its receipt number.
-  Future<void> restoreInstallment(Student s, DateTime month, PayInstallment inst) =>
-      _changeCycle(s, month, (p) => p.copyWith(installments: [...p.installments, inst]));
 
   /// Remove one payment (and its income record, if an older version made one).
   Future<void> removeInstallment(Payment p, String installmentId) async {
@@ -682,9 +666,11 @@ class Repo {
     if (inst.txnId.isNotEmpty) await deleteTxn(inst.txnId);
     final s = student(p.studentId);
     final month = DateTime.parse('${p.month}-01');
-    await _savePayment(
-        p.copyWith(installments: p.installments.where((i) => i.id != installmentId).toList()),
-        s, month);
+    await _savePayment(Payment(
+      id: p.id, studentId: p.studentId, month: p.month, amount: p.amount,
+      installments: p.installments.where((i) => i.id != installmentId).toList(),
+      customDue: p.customDue,
+    ), s, month);
   }
 
   Future<void> _savePayment(Payment p, Student? s, DateTime month) {
@@ -692,30 +678,20 @@ class Repo {
     final due = s == null ? p.amount : dueForMonth(s, month);
     final status = paid <= 0 ? 'pending' : paid >= due - 0.5 ? 'paid' : 'partial';
     _paysCache = null;
-    return payments.put(p.id, p.copyWith(amount: due, status: status, paidAmount: paid).toMap())
-        .whenComplete(() => _paysCache = null);
+    return payments.put(p.id, Payment(
+      id: p.id, studentId: p.studentId, month: p.month, amount: due, status: status,
+      paidAmount: paid, installments: p.installments, customDue: p.customDue,
+    ).toMap()).whenComplete(() => _paysCache = null);
   }
 
   /// Set (or clear with null) the fee for one month by hand.
-  Future<void> setCustomDue(Student s, DateTime month, double? due) =>
-      _changeCycle(s, month, (p) => p.copyWith(customDue: due, clearCustomDue: due == null));
-
-  Future<void> addAdjustment(Student s, DateTime month, FeeAdjustment a) =>
-      _changeCycle(s, month, (p) => p.copyWith(adjustments: [...p.adjustments, a]));
-
-  Future<void> removeAdjustment(Student s, DateTime month, String id) =>
-      _changeCycle(s, month, (p) => p.copyWith(adjustments: p.adjustments.where((a) => a.id != id).toList()));
-
-  Future<void> setLateFeeWaived(Student s, DateTime month, bool waived) =>
-      _changeCycle(s, month, (p) => p.copyWith(lateFeeWaived: waived));
-
-  Future<void> markReminded(Student s, DateTime month) => _changeCycle(
-      s, month, (p) => p.copyWith(reminded: [...p.reminded, DateTime.now().toIso8601String()]));
-
-  /// Adds a fee plan version, or replaces the one that starts at the same month.
-  Future<void> setPlan(Student s, FeePlan plan) {
-    final others = s.plans.where((p) => p.from != plan.from).toList();
-    return saveStudent(s.withPlans([...others, plan]));
+  Future<void> setCustomDue(Student s, DateTime month, double? due) {
+    final mk = monthKey(month);
+    final old = paymentFor(s.id, mk);
+    return _savePayment(Payment(
+      id: old?.id ?? newId(), studentId: s.id, month: mk, amount: old?.amount ?? 0,
+      installments: old?.installments ?? const [], customDue: due,
+    ), s, month);
   }
 
   // ---- reactive listenables (for AnimatedBuilder / ValueListenableBuilder) ----
@@ -790,7 +766,6 @@ class Repo {
       await box.clear();
       await box.putAll(e.value);
       _logsCache = _paysCache = null;
-      _feeCfg = null;
       if (keepPin != null) await box.put('pinHash', keepPin);
     }
     // An older backup has none of the newer upgrades applied: run them on the restored data.

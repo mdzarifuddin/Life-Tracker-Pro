@@ -74,8 +74,6 @@ class Student {
   /// Per-day system: [monthlyFee] is the fee for ONE class and the month's
   /// bill is that rate × classes taught (no fixed classes per month).
   final bool payPerClass;
-  /// Fee plan versions (empty = the single plan implied by monthlyFee / classesPerMonth / payPerClass).
-  final List<FeePlan> feePlans;
 
   Student({
     required this.id,
@@ -99,7 +97,6 @@ class Student {
     this.billingDay = 1,
     this.billingStart = '',
     this.payPerClass = false,
-    this.feePlans = const [],
   });
 
   DateTime? get billingStartDate => billingStart.isEmpty ? null : DateTime.tryParse(billingStart);
@@ -108,34 +105,6 @@ class Student {
   double get perClassFee => payPerClass
       ? monthlyFee
       : (classesPerMonth > 0 ? monthlyFee / classesPerMonth : monthlyFee);
-
-  /// The fee plan versions in effect, oldest first. A student saved before fee plans
-  /// existed gets one plan built from the old fee fields.
-  List<FeePlan> get plans {
-    if (feePlans.isNotEmpty) return feePlans;
-    final FeePlan p;
-    if (payPerClass) {
-      p = FeePlan(id: 'legacy', kind: FeePlan.perClass, amount: monthlyFee);
-    } else {
-      p = FeePlan(id: 'legacy', kind: FeePlan.monthly, amount: monthlyFee,
-          classesPerCycle: classesPerMonth > 0 ? classesPerMonth : 0);
-    }
-    return [p];
-  }
-
-  /// This student with new plan versions; the old fee fields follow the latest one so
-  /// cards and lists that still read them stay correct.
-  Student withPlans(List<FeePlan> next) {
-    final sorted = [...next]..sort((a, b) => a.from.compareTo(b.from));
-    final last = sorted.isEmpty ? null : sorted.last;
-    final m = {...toMap(), 'feePlans': sorted.map((p) => p.toMap()).toList()};
-    if (last != null) {
-      m['monthlyFee'] = last.kind == FeePlan.package ? last.perClassRate : last.amount;
-      m['payPerClass'] = last.kind == FeePlan.perClass || last.kind == FeePlan.package;
-      m['classesPerMonth'] = last.kind == FeePlan.monthly ? last.classesPerCycle : 0;
-    }
-    return Student.fromMap(m);
-  }
 
   /// First guardian (kept for older code/backups).
   String get guardianName => guardians.isEmpty ? '' : guardians.first.name;
@@ -161,7 +130,6 @@ class Student {
         'guardianName': guardianName, 'guardianPhone': guardianPhone, 'photo': photo,
         'guardians': guardians.map((g) => g.toMap()).toList(),
         'leftOn': leftOn, 'billingDay': billingDay, 'billingStart': billingStart, 'payPerClass': payPerClass,
-        if (feePlans.isNotEmpty) 'feePlans': feePlans.map((p) => p.toMap()).toList(),
       };
 
   factory Student.fromMap(Map m) => Student(
@@ -181,9 +149,6 @@ class Student {
         photo: _s(m['photo']),
         leftOn: _s(m['leftOn']),
         payPerClass: m['payPerClass'] == true,
-        feePlans: m['feePlans'] is List
-            ? (m['feePlans'] as List).whereType<Map>().map(FeePlan.fromMap).toList()
-            : const [],
         billingStart: _s(m['billingStart']),
         billingDay: (_i(m['billingDay']) < 1 || _i(m['billingDay']) > 31) ? 1 : _i(m['billingDay']),
       );
@@ -271,256 +236,24 @@ class ScheduleItem {
   int get endMinutes => startMinutes + durationMin;
 }
 
-/// One version of how a student is charged. A student can have several, each
-/// starting from a month, so changing a fee never rewrites earlier months.
-class FeePlan {
-  static const monthly = 'monthly', perClass = 'perClass', package = 'package', fixed = 'fixed';
-
-  final String id, from, kind, label;
-  /// 'yyyy-MM' of the first cycle this version applies to ('' = from the beginning).
-  /// monthly: the monthly fee · perClass: rate per class · package: price of one
-  /// package · fixed: a one-time amount.
-  final double amount, discountPct, discountFlat;
-  /// monthly only: > 0 = fee is pro-rated by classes taught (fee / n x classes), 0 = flat.
-  final int classesPerCycle;
-  /// package only: classes in one package.
-  final int packageSize;
-  /// 0 = last day of the cycle, 1..31 = that day of the cycle, null = use the setting.
-  final int? dueDay;
-  final int? graceDays;
-  /// null = use the setting, 0 = no late fee, > 0 = flat late fee per overdue cycle.
-  final double? lateFee;
-
-  const FeePlan({
-    required this.id,
-    this.from = '',
-    this.kind = monthly,
-    this.label = '',
-    this.amount = 0,
-    this.classesPerCycle = 0,
-    this.packageSize = 0,
-    this.discountPct = 0,
-    this.discountFlat = 0,
-    this.dueDay,
-    this.graceDays,
-    this.lateFee,
-  });
-
-  FeePlan copyWith({
-    String? id, String? from, String? kind, String? label, double? amount,
-    int? classesPerCycle, int? packageSize, double? discountPct, double? discountFlat,
-    int? dueDay, int? graceDays, double? lateFee,
-    bool clearDueDay = false, bool clearGrace = false, bool clearLate = false,
-  }) =>
-      FeePlan(
-        id: id ?? this.id, from: from ?? this.from, kind: kind ?? this.kind,
-        label: label ?? this.label, amount: amount ?? this.amount,
-        classesPerCycle: classesPerCycle ?? this.classesPerCycle,
-        packageSize: packageSize ?? this.packageSize,
-        discountPct: discountPct ?? this.discountPct,
-        discountFlat: discountFlat ?? this.discountFlat,
-        dueDay: clearDueDay ? null : (dueDay ?? this.dueDay),
-        graceDays: clearGrace ? null : (graceDays ?? this.graceDays),
-        lateFee: clearLate ? null : (lateFee ?? this.lateFee),
-      );
-
-  /// Per-class equivalent, for cards and quick previews.
-  double get perClassRate {
-    switch (kind) {
-      case perClass: return amount;
-      case package: return packageSize > 0 ? amount / packageSize : amount;
-      case monthly: return classesPerCycle > 0 ? amount / classesPerCycle : amount;
-      default: return amount;
-    }
-  }
-
-  Map<String, dynamic> toMap() => {
-        'id': id, 'from': from, 'kind': kind, 'label': label, 'amount': amount,
-        'classesPerCycle': classesPerCycle, 'packageSize': packageSize,
-        'discountPct': discountPct, 'discountFlat': discountFlat,
-        'dueDay': dueDay, 'graceDays': graceDays, 'lateFee': lateFee,
-      };
-
-  factory FeePlan.fromMap(Map m) {
-    final k = _s(m['kind']);
-    return FeePlan(
-      id: _s(m['id']), from: _s(m['from']),
-      kind: const [monthly, perClass, package, fixed].contains(k) ? k : monthly,
-      label: _s(m['label']), amount: _d(m['amount']),
-      classesPerCycle: _i(m['classesPerCycle']), packageSize: _i(m['packageSize']),
-      discountPct: _d(m['discountPct']), discountFlat: _d(m['discountFlat']),
-      dueDay: m['dueDay'] == null ? null : _i(m['dueDay']),
-      graceDays: m['graceDays'] == null ? null : _i(m['graceDays']),
-      lateFee: m['lateFee'] == null ? null : _d(m['lateFee']),
-    );
-  }
-}
-
-/// A one-off change to one cycle's bill: a discount / waiver, or an extra charge.
-class FeeAdjustment {
-  static const discount = 'discount', charge = 'charge', waiver = 'waiver';
-  final String id, kind, label, note;
-  final double amount; // always positive; [kind] says which way it goes
-  final DateTime date;
-  const FeeAdjustment({required this.id, required this.kind, required this.amount,
-      required this.date, this.label = '', this.note = ''});
-
-  /// Effect on the bill: + for a charge, − for a discount or waiver.
-  double get signed => kind == charge ? amount : -amount;
-
-  Map<String, dynamic> toMap() => {'id': id, 'kind': kind, 'label': label, 'note': note,
-        'amount': amount, 'date': date.toIso8601String()};
-  factory FeeAdjustment.fromMap(Map m) => FeeAdjustment(
-        id: _s(m['id']),
-        kind: const [discount, charge, waiver].contains(_s(m['kind'])) ? _s(m['kind']) : charge,
-        label: _s(m['label']), note: _s(m['note']), amount: _d(m['amount']).abs(),
-        date: DateTime.tryParse(_s(m['date'])) ?? DateTime.now());
-}
-
-/// How a payment was made (Cash, bKash…). Fully editable in the fee settings.
-class PayMethod {
-  final String id, name, icon;
-  final bool needsRef, enabled;
-  const PayMethod({required this.id, required this.name, this.icon = 'cash',
-      this.needsRef = false, this.enabled = true});
-  PayMethod copyWith({String? name, String? icon, bool? needsRef, bool? enabled}) => PayMethod(
-      id: id, name: name ?? this.name, icon: icon ?? this.icon,
-      needsRef: needsRef ?? this.needsRef, enabled: enabled ?? this.enabled);
-  Map<String, dynamic> toMap() =>
-      {'id': id, 'name': name, 'icon': icon, 'needsRef': needsRef, 'enabled': enabled};
-  factory PayMethod.fromMap(Map m) => PayMethod(
-      id: _s(m['id']), name: _s(m['name']), icon: _s(m['icon']).isEmpty ? 'cash' : _s(m['icon']),
-      needsRef: m['needsRef'] == true, enabled: m['enabled'] != false);
-}
-
-/// Everything about fees the user can customise. Stored as one map in the settings box.
-class FeeSettings {
-  static const defaultReminder =
-      'Assalamu alaikum {guardian}, {student}\'s tuition fee of {amount} for {month} '
-      'is due{overdue}. Please pay when convenient. Thank you. – {tutor}';
-
-  final int defaultDueDay, defaultGraceDays, dueSoonDays;
-  final bool lateFeeOn;
-  final double lateFeeAmount;
-  final List<PayMethod> methods;
-  final String defaultMethod;
-  final List<String> chargeTypes;
-  final List<FeePlan> templates;
-  final String tutorName, receiptHeader, receiptFooter, reminderTemplate;
-
-  const FeeSettings({
-    this.defaultDueDay = 0,
-    this.defaultGraceDays = 5,
-    this.dueSoonDays = 7,
-    this.lateFeeOn = false,
-    this.lateFeeAmount = 100,
-    this.methods = defaultMethods,
-    this.defaultMethod = 'cash',
-    this.chargeTypes = const ['Admission', 'Exam fee', 'Books', 'Materials', 'Transport'],
-    this.templates = const [],
-    this.tutorName = '',
-    this.receiptHeader = '',
-    this.receiptFooter = 'Thank you!',
-    this.reminderTemplate = defaultReminder,
-  });
-
-  static const defaultMethods = <PayMethod>[
-    PayMethod(id: 'cash', name: 'Cash', icon: 'cash'),
-    PayMethod(id: 'bkash', name: 'bKash', icon: 'phone', needsRef: true),
-    PayMethod(id: 'nagad', name: 'Nagad', icon: 'phone', needsRef: true),
-    PayMethod(id: 'rocket', name: 'Rocket', icon: 'phone', needsRef: true),
-    PayMethod(id: 'bank', name: 'Bank', icon: 'bank', needsRef: true),
-  ];
-
-  List<PayMethod> get activeMethods => methods.where((m) => m.enabled).toList();
-  PayMethod? methodById(String id) {
-    for (final m in methods) {
-      if (m.id == id) return m;
-    }
-    return null;
-  }
-
-  FeeSettings copyWith({
-    int? defaultDueDay, int? defaultGraceDays, int? dueSoonDays, bool? lateFeeOn,
-    double? lateFeeAmount, List<PayMethod>? methods, String? defaultMethod,
-    List<String>? chargeTypes, List<FeePlan>? templates, String? tutorName,
-    String? receiptHeader, String? receiptFooter, String? reminderTemplate,
-  }) =>
-      FeeSettings(
-        defaultDueDay: defaultDueDay ?? this.defaultDueDay,
-        defaultGraceDays: defaultGraceDays ?? this.defaultGraceDays,
-        dueSoonDays: dueSoonDays ?? this.dueSoonDays,
-        lateFeeOn: lateFeeOn ?? this.lateFeeOn,
-        lateFeeAmount: lateFeeAmount ?? this.lateFeeAmount,
-        methods: methods ?? this.methods,
-        defaultMethod: defaultMethod ?? this.defaultMethod,
-        chargeTypes: chargeTypes ?? this.chargeTypes,
-        templates: templates ?? this.templates,
-        tutorName: tutorName ?? this.tutorName,
-        receiptHeader: receiptHeader ?? this.receiptHeader,
-        receiptFooter: receiptFooter ?? this.receiptFooter,
-        reminderTemplate: reminderTemplate ?? this.reminderTemplate,
-      );
-
-  Map<String, dynamic> toMap() => {
-        'v': 1,
-        'defaultDueDay': defaultDueDay, 'defaultGraceDays': defaultGraceDays,
-        'dueSoonDays': dueSoonDays, 'lateFeeOn': lateFeeOn, 'lateFeeAmount': lateFeeAmount,
-        'methods': methods.map((m) => m.toMap()).toList(), 'defaultMethod': defaultMethod,
-        'chargeTypes': chargeTypes, 'templates': templates.map((t) => t.toMap()).toList(),
-        'tutorName': tutorName, 'receiptHeader': receiptHeader,
-        'receiptFooter': receiptFooter, 'reminderTemplate': reminderTemplate,
-      };
-
-  factory FeeSettings.fromMap(Map m) {
-    const d = FeeSettings();
-    final methods = m['methods'] is List
-        ? (m['methods'] as List).whereType<Map>().map(PayMethod.fromMap).toList()
-        : <PayMethod>[];
-    return FeeSettings(
-      defaultDueDay: m['defaultDueDay'] == null ? d.defaultDueDay : _i(m['defaultDueDay']).clamp(0, 31),
-      defaultGraceDays: m['defaultGraceDays'] == null ? d.defaultGraceDays : _i(m['defaultGraceDays']).clamp(0, 90),
-      dueSoonDays: m['dueSoonDays'] == null ? d.dueSoonDays : _i(m['dueSoonDays']).clamp(0, 60),
-      lateFeeOn: m['lateFeeOn'] == true,
-      lateFeeAmount: m['lateFeeAmount'] == null ? d.lateFeeAmount : _d(m['lateFeeAmount']),
-      methods: methods.isEmpty ? defaultMethods : methods,
-      defaultMethod: _s(m['defaultMethod']).isEmpty ? d.defaultMethod : _s(m['defaultMethod']),
-      chargeTypes: m['chargeTypes'] is List ? _ls(m['chargeTypes']) : d.chargeTypes,
-      templates: m['templates'] is List
-          ? (m['templates'] as List).whereType<Map>().map(FeePlan.fromMap).toList()
-          : const [],
-      tutorName: _s(m['tutorName']), receiptHeader: _s(m['receiptHeader']),
-      receiptFooter: m['receiptFooter'] == null ? d.receiptFooter : _s(m['receiptFooter']),
-      reminderTemplate: _s(m['reminderTemplate']).isEmpty ? d.reminderTemplate : _s(m['reminderTemplate']),
-    );
-  }
-}
-
 /// One payment toward a month's fee (full or partial), with its own date.
 class PayInstallment {
   final String id, txnId, account;
   final double amount;
   final DateTime date;
   final int classes; // classes this payment covers (0 = just an amount)
-  /// [PayMethod] id ('' = not recorded), reference (bKash trx id…), free note, receipt number.
-  final String method, ref, note;
-  final int receiptNo; // 0 = made before receipts existed
   PayInstallment({required this.id, required this.amount, required this.date,
-      this.txnId = '', this.account = '', this.classes = 0,
-      this.method = '', this.ref = '', this.note = '', this.receiptNo = 0});
+      this.txnId = '', this.account = '', this.classes = 0});
 
   Map<String, dynamic> toMap() => {
         'id': id, 'amount': amount, 'date': date.toIso8601String(),
         'txnId': txnId, 'account': account, 'classes': classes,
-        'method': method, 'ref': ref, 'note': note, 'receiptNo': receiptNo,
       };
   factory PayInstallment.fromMap(Map m) => PayInstallment(
         id: _s(m['id']), amount: _d(m['amount']),
         date: DateTime.tryParse(_s(m['date'])) ?? DateTime.now(),
         txnId: _s(m['txnId']), account: _s(m['account']),
         classes: _i(m['classes']),
-        method: _s(m['method']), ref: _s(m['ref']), note: _s(m['note']),
-        receiptNo: _i(m['receiptNo']),
       );
 }
 
@@ -530,13 +263,6 @@ class Payment {
   final List<PayInstallment> installments;
   /// Fee set by hand for this one month (null = worked out from classes / monthly fee).
   final double? customDue;
-  /// One-off discounts / waivers / extra charges for this cycle.
-  final List<FeeAdjustment> adjustments;
-  /// The late fee of this cycle is forgiven.
-  final bool lateFeeWaived;
-  /// ISO timestamps of reminders sent for this cycle.
-  final List<String> reminded;
-  final String note;
 
   Payment({
     required this.id,
@@ -548,39 +274,16 @@ class Payment {
     this.txnId = '',
     this.installments = const [],
     this.customDue,
-    this.adjustments = const [],
-    this.lateFeeWaived = false,
-    this.reminded = const [],
-    this.note = '',
   });
 
   /// Sum of all installments.
   double get paid => installments.fold(0.0, (s, i) => s + i.amount);
-
-  Payment copyWith({
-    double? amount, String? status, double? paidAmount,
-    List<PayInstallment>? installments, double? customDue, bool clearCustomDue = false,
-    List<FeeAdjustment>? adjustments, bool? lateFeeWaived, List<String>? reminded, String? note,
-  }) =>
-      Payment(
-        id: id, studentId: studentId, month: month, txnId: txnId,
-        amount: amount ?? this.amount, status: status ?? this.status,
-        paidAmount: paidAmount ?? this.paidAmount,
-        installments: installments ?? this.installments,
-        customDue: clearCustomDue ? null : (customDue ?? this.customDue),
-        adjustments: adjustments ?? this.adjustments,
-        lateFeeWaived: lateFeeWaived ?? this.lateFeeWaived,
-        reminded: reminded ?? this.reminded,
-        note: note ?? this.note,
-      );
 
   Map<String, dynamic> toMap() => {
         'id': id, 'studentId': studentId, 'month': month, 'status': status,
         'txnId': txnId, 'amount': amount, 'paidAmount': paidAmount,
         'installments': installments.map((i) => i.toMap()).toList(),
         'customDue': customDue,
-        'adjustments': adjustments.map((a) => a.toMap()).toList(),
-        'lateFeeWaived': lateFeeWaived, 'reminded': reminded, 'note': note,
       };
 
   factory Payment.fromMap(Map m) {
@@ -599,12 +302,6 @@ class Payment {
       txnId: _s(m['txnId']), amount: _d(m['amount']),
       paidAmount: _d(m['paidAmount']), installments: inst,
       customDue: m['customDue'] == null ? null : _d(m['customDue']),
-      adjustments: m['adjustments'] is List
-          ? (m['adjustments'] as List).whereType<Map>().map(FeeAdjustment.fromMap).toList()
-          : const [],
-      lateFeeWaived: m['lateFeeWaived'] == true,
-      reminded: _ls(m['reminded']),
-      note: _s(m['note']),
     );
   }
 }

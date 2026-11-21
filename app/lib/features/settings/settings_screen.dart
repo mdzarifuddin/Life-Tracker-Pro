@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/backup.dart';
 import '../../core/providers.dart';
@@ -121,12 +120,6 @@ class SettingsScreen extends ConsumerWidget {
             Gap.l,
             const SectionTitle('General'),
             Card(child: Column(children: [
-              ListTile(
-                leading: const Icon(Icons.payments_outlined, color: AppColors.income),
-                title: const Text('Fee settings'),
-                subtitle: const Text('Due dates, late fee, payment methods, receipts, reminders'),
-                onTap: () => context.push('/fee-settings'),
-              ),
               ValueListenableBuilder<VersionStatus>(
                 valueListenable: versionStatus,
                 builder: (context, v, _) => ListTile(
