@@ -18,6 +18,8 @@ import '../exams/exams_screen.dart';
 import '../schedule/routines_screen.dart' show addRoutineFromGallery, RoutineViewer;
 import 'batch_detail_screen.dart';
 import 'busy_time.dart';
+import '../payments/collect_sheet.dart' show showCollectSheet;
+import '../payments/plan_editor.dart' show planSummary;
 import 'batch_screen.dart';
 import '../schedule/schedule_screen.dart';
 
@@ -507,13 +509,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                     Gap.m,
                     Row(children: [
                       const Icon(Icons.payments, size: 18), const SizedBox(width: 6),
-                      Text(s.payPerClass ? 'Fee ${taka(s.monthlyFee)}/class' : 'Fee ${taka(s.monthlyFee)}/mo'),
-                      if (s.payPerClass) ...[const SizedBox(width: 14),
-                        const Icon(Icons.event_repeat, size: 16), const SizedBox(width: 4),
-                        const Text('Per day')]
-                      else if (s.classesPerMonth > 0) ...[const SizedBox(width: 14),
-                        const Icon(Icons.event_repeat, size: 16), const SizedBox(width: 4),
-                        Text('${s.classesPerMonth}/month')],
+                      Expanded(child: Text(planSummary(s.plans.last), maxLines: 2, overflow: TextOverflow.ellipsis)),
                     ]),
                     if (s.billingDay != 1) ...[Gap.s, Row(children: [
                       const Icon(Icons.today, size: 16), const SizedBox(width: 6),
@@ -546,33 +542,40 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                       InfoChip(Icons.hourglass_bottom, _studyingFor(s, logs), color: AppColors.savings),
                       InfoChip(Icons.payments, 'Received ${taka(totalReceived)}', color: AppColors.income),
                     ]),
+                    Gap.s,
+                    Builder(builder: (context) {
+                      final a = repo.feeAccount(s);
+                      final c = a.owed > 0.5 ? (a.isOverdue ? AppColors.expense : AppColors.warning) : AppColors.income;
+                      return Row(children: [
+                        Expanded(child: GestureDetector(
+                          onTap: () => context.push('/student-fees/$id'),
+                          child: InfoChip(
+                            Icons.account_balance_wallet_outlined,
+                            a.owed > 0.5
+                                ? (a.isOverdue ? 'Owes ${taka(a.owed)} · overdue ${a.overdueDays}d' : 'Owes ${taka(a.owed)}')
+                                : a.credit > 0.5 ? 'Advance ${taka(a.credit)}' : 'All clear',
+                            color: c),
+                        )),
+                        if (a.owed > 0.5) ...[
+                          const SizedBox(width: 8),
+                          FilledButton.tonal(
+                            style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+                            onPressed: () => showCollectSheet(context, ref, s,
+                                month: a.unpaid.isEmpty ? null : a.unpaid.first.month),
+                            child: const Text('Collect'),
+                          ),
+                        ],
+                        TextButton(
+                          onPressed: () => context.push('/student-fees/$id'),
+                          child: const Text('Details'),
+                        ),
+                      ]);
+                    }),
                   ])),
                   Gap.l,
                   SizedBox(width: double.infinity, child: FilledButton.tonalIcon(
                     onPressed: () => context.push('/class-log', extra: id),
                     icon: const Icon(Icons.edit_note), label: const Text('Log Class'))),
-                  Gap.s,
-                  Builder(builder: (context) {
-                    final a = repo.feeAccount(s);
-                    final over = a.isOverdue;
-                    return PadCard(
-                      onTap: () => context.push('/student-fees/$id'),
-                      child: Row(children: [
-                        Icon(Icons.account_balance_wallet_outlined,
-                            color: a.owed > 0.5 ? (over ? AppColors.expense : AppColors.warning) : AppColors.income),
-                        Gap.m,
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Fees', style: TextStyle(fontWeight: FontWeight.w700)),
-                          Text(
-                            a.owed > 0.5
-                                ? (over ? 'Owes ${taka(a.owed)} · overdue ${a.overdueDays}d' : 'Owes ${taka(a.owed)}')
-                                : a.credit > 0.5 ? 'Advance ${taka(a.credit)}' : 'All clear',
-                            style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12.5)),
-                        ])),
-                        const Icon(Icons.chevron_right),
-                      ]),
-                    );
-                  }),
                   Gap.l,
                   SectionTitle('Routine pictures', icon: Icons.photo_library_outlined, color: AppColors.savings,
                       trailing: TextButton.icon(
