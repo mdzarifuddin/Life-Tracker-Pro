@@ -334,14 +334,23 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                             if (st.carry > 0.5)
                               Text('Includes previous due ${taka(st.carry)}',
                                   style: const TextStyle(color: AppColors.warning, fontSize: 12)),
-                            if (st.status == 'partial')
-                              Text('Paid ${taka(st.paid)} · Left ${taka(st.remaining)}',
-                                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+                            if (st.paid > 0)
+                              Text('Paid ${taka(st.paid)}',
+                                  style: const TextStyle(color: AppColors.income, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                            if (st.remaining > 0.5)
+                              Text('Due ${taka(st.remaining)}',
+                                  style: const TextStyle(color: AppColors.expense, fontSize: 12.5, fontWeight: FontWeight.w700)),
                           ])),
-                          Chip(
-                            label: Text(feeStatusLabel(st.status),
-                                style: const TextStyle(color: Colors.white, fontSize: 12)),
-                            backgroundColor: color, visualDensity: VisualDensity.compact),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                            Text(taka(st.due), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                            Text('$classes ${classes == 1 ? 'class' : 'classes'}',
+                                style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+                            const SizedBox(height: 2),
+                            Chip(
+                              label: Text(feeStatusLabel(st.status),
+                                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+                              backgroundColor: color, visualDensity: VisualDensity.compact),
+                          ]),
                         ]),
                       ),
                     );

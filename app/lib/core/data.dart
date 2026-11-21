@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models.dart';
@@ -12,7 +15,7 @@ class Repo {
   static const _boxes = [
     'students', 'classlogs', 'schedules', 'payments', 'txns',
     'categories', 'accounts', 'routines', 'absences', 'exams', 'jobtasks', 'jobapps', 'studylogs', 'tasks',
-    'scheddone', 'thesis', 'listitems', 'settings',
+    'scheddone', 'busytimes', 'thesis', 'listitems', 'settings',
   ];
 
   late final Box students = Hive.box('students');
@@ -30,6 +33,7 @@ class Repo {
   late final Box studylogs = Hive.box('studylogs');
   late final Box tasks = Hive.box('tasks');
   late final Box scheddone = Hive.box('scheddone');
+  late final Box busytimes = Hive.box('busytimes');
   late final Box thesis = Hive.box('thesis');
   late final Box listitems = Hive.box('listitems');
   late final Box settings = Hive.box('settings');
@@ -149,6 +153,7 @@ class Repo {
           id: p.id, studentId: p.studentId, month: p.month, amount: p.amount,
           status: p.status, paidAmount: p.paidAmount, txnId: p.txnId,
           installments: [PayInstallment(id: p.id, amount: p.paidAmount, date: date, txnId: p.txnId)]);
+        _paysCache = null;
         payments.put(p.id, fixed.toMap());
       }
       settings.put('payInstV1', true);
@@ -174,9 +179,22 @@ class Repo {
 
   Student? student(String id) =>
       students.containsKey(id) ? Student.fromMap(students.get(id) as Map) : null;
-  List<ClassLog> logsFor(String sid) =>
-      _all(classlogs, ClassLog.fromMap).where((e) => e.studentId == sid).toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
+  // Decoded logs/payments grouped by student; rebuilt only after those boxes change.
+  static Map<String, List<ClassLog>>? _logsCache;
+  static Map<String, List<Payment>>? _paysCache;
+
+  Map<String, List<ClassLog>> get _logsBySid => _logsCache ??= () {
+        final m = <String, List<ClassLog>>{};
+        for (final l in _all(classlogs, ClassLog.fromMap)) {
+          (m[l.studentId] ??= []).add(l);
+        }
+        for (final v in m.values) {
+          v.sort((a, b) => b.date.compareTo(a.date));
+        }
+        return m;
+      }();
+
+  List<ClassLog> logsFor(String sid) => List.of(_logsBySid[sid] ?? const []);
   ClassLog? lastLog(String sid) {
     final l = logsFor(sid);
     return l.isEmpty ? null : l.first;
@@ -344,6 +362,7 @@ class Repo {
       if (absentIds.contains(s.id)) {
         for (final l in logs.where((l) => l.id.startsWith('batch_'))) {
           await classlogs.delete(l.id);
+          _logsCache = null;
         }
         if (prior.isEmpty) {
           await saveAbsence(Absence(id: newId(), studentId: s.id, date: key, batch: batch));
@@ -360,6 +379,21 @@ class Repo {
         }
       }
     }
+  }
+
+  // ---- student busy times ----
+  List<BusyTime> busyFor(String sid) =>
+      _all(busytimes, BusyTime.fromMap).where((b) => b.studentId == sid).toList()
+        ..sort((a, b) => a.startMinutes.compareTo(b.startMinutes));
+  Future<void> saveBusy(BusyTime b) => busytimes.put(b.id, b.toMap());
+  Future<void> deleteBusy(String id) => busytimes.delete(id);
+
+  /// The busy slot of [sid] overlapping [start, end) on weekday [day] (0 = Monday), if any.
+  BusyTime? busyClash(String sid, int day, int start, int end) {
+    for (final b in busyFor(sid)) {
+      if (b.days.contains(day) && start < b.endMinutes && b.startMinutes < end) return b;
+    }
+    return null;
   }
 
   // ---- routine pictures ----
@@ -505,6 +539,14 @@ class Repo {
       _all(listitems, ListItem.fromMap).where((e) => e.listType == type).toList();
 
   List<Payment> get paymentList => _all(payments, Payment.fromMap);
+  List<Payment> paymentsOf(String sid) =>
+      (_paysCache ??= () {
+        final m = <String, List<Payment>>{};
+        for (final p in paymentList) {
+          (m[p.studentId] ??= []).add(p);
+        }
+        return m;
+      }())[sid] ?? const [];
   Payment? paymentFor(String sid, String month) {
     try {
       return paymentList.firstWhere((p) => p.studentId == sid && p.month == month);
@@ -514,10 +556,15 @@ class Repo {
   }
 
   // ---- dashboard aggregates ----
-  double incomeThisMonth() => txnsForMonth(DateTime.now()).where((t) => !separateAccountIds.contains(t.account)).toList()
+  List<Txn> _thisMonthInTotal() {
+    final sep = separateAccountIds; // computed once, not per record
+    return txnsForMonth(DateTime.now()).where((t) => !sep.contains(t.account)).toList();
+  }
+
+  double incomeThisMonth() => _thisMonthInTotal()
       .where((t) => t.type == 'income')
       .fold(0.0, (s, t) => s + t.amount);
-  double expenseThisMonth() => txnsForMonth(DateTime.now()).where((t) => !separateAccountIds.contains(t.account)).toList()
+  double expenseThisMonth() => _thisMonthInTotal()
       .where((t) => t.type == 'expense')
       .fold(0.0, (s, t) => s + t.amount);
   double pendingFees() {
@@ -531,7 +578,10 @@ class Repo {
   // ---- writers ----
   Future<void> saveStudent(Student s) => students.put(s.id, s.toMap());
   Future<void> deleteStudent(String id) => students.delete(id);
-  Future<void> saveLog(ClassLog l) => classlogs.put(l.id, l.toMap());
+  Future<void> saveLog(ClassLog l) {
+    _logsCache = null;
+    return classlogs.put(l.id, l.toMap()).whenComplete(() => _logsCache = null);
+  }
   Future<void> saveSchedule(ScheduleItem s) => schedules.put(s.id, s.toMap());
   Future<void> deleteSchedule(String id) => schedules.delete(id);
   Future<void> saveTxn(Txn t) => txns.put(t.id, t.toMap());
@@ -559,7 +609,7 @@ class Repo {
       payState(Student s, DateTime month) {
     final dates = logsFor(s.id).map((l) => l.date).toList();
     final pays = <String, Payment>{
-      for (final p in paymentList.where((p) => p.studentId == s.id)) p.month: p,
+      for (final p in paymentsOf(s.id)) p.month: p,
     };
     double dueOf(DateTime m) {
       final custom = pays[monthKey(m)]?.customDue;
@@ -627,10 +677,11 @@ class Repo {
     final paid = p.paid;
     final due = s == null ? p.amount : dueForMonth(s, month);
     final status = paid <= 0 ? 'pending' : paid >= due - 0.5 ? 'paid' : 'partial';
+    _paysCache = null;
     return payments.put(p.id, Payment(
       id: p.id, studentId: p.studentId, month: p.month, amount: due, status: status,
       paidAmount: paid, installments: p.installments, customDue: p.customDue,
-    ).toMap());
+    ).toMap()).whenComplete(() => _paysCache = null);
   }
 
   /// Set (or clear with null) the fee for one month by hand.
@@ -659,17 +710,21 @@ class Repo {
   Listenable get studylogsL => studylogs.listenable();
   Listenable get tasksL => tasks.listenable();
   Listenable get scheddoneL => scheddone.listenable();
+  Listenable get busytimesL => busytimes.listenable();
   Listenable get thesisL => thesis.listenable();
   Listenable get listitemsL => listitems.listenable();
   Listenable get settingsL => settings.listenable();
 
   // ---- backup / restore ----
+  /// Everything in the app as plain JSON-able data. The vault PIN is left out so a
+  /// shared backup file can't be used to crack it.
   Map<String, dynamic> exportAll() {
-    final out = <String, dynamic>{'_app': 'life_tracker_pro', '_version': 2};
+    final out = <String, dynamic>{'_app': 'life_tracker_pro', '_version': 3};
     for (final name in _boxes) {
       final box = Hive.box(name);
       final m = <String, dynamic>{};
       for (final key in box.keys) {
+        if (name == 'settings' && key == 'pinHash') continue;
         m['$key'] = box.get(key);
       }
       out[name] = m;
@@ -677,17 +732,41 @@ class Repo {
     return out;
   }
 
-  Future<void> importAll(Map data) async {
+  /// Throws a [FormatException] with a readable message if [data] is not a backup
+  /// made by this app. Nothing is changed.
+  static void validateBackup(Map data) {
+    if (data['_app'] != 'life_tracker_pro') {
+      throw const FormatException('This is not a Life Tracker Pro backup file.');
+    }
+    var found = 0;
     for (final name in _boxes) {
       if (!data.containsKey(name)) continue;
+      if (data[name] is! Map) throw FormatException('Backup is damaged ("$name").');
+      found++;
+    }
+    if (found == 0) throw const FormatException('The backup file has no data.');
+  }
+
+  /// Restores a backup. The file is fully checked and read into memory before any
+  /// box is cleared; the local vault PIN is kept.
+  Future<void> importAll(Map data) async {
+    validateBackup(data);
+    final staged = <String, Map<String, dynamic>>{};
+    for (final name in _boxes) {
       final m = data[name];
       if (m is! Map) continue;
-      final box = Hive.box(name);
+      staged[name] = {
+        for (final e in m.entries)
+          '${e.key}': e.value is Map ? Map<String, dynamic>.from(e.value as Map) : e.value,
+      };
+    }
+    for (final e in staged.entries) {
+      final box = Hive.box(e.key);
+      final keepPin = e.key == 'settings' ? box.get('pinHash') : null;
       await box.clear();
-      for (final entry in m.entries) {
-        final v = entry.value;
-        await box.put(entry.key, v is Map ? Map<String, dynamic>.from(v) : v);
-      }
+      await box.putAll(e.value);
+      _logsCache = _paysCache = null;
+      if (keepPin != null) await box.put('pinHash', keepPin);
     }
     // An older backup has none of the newer upgrades applied: run them on the restored data.
     for (final f in ['bazarRename', 'noCashV1', 'payInstV1']) {
@@ -704,6 +783,34 @@ class Repo {
 
   String? get pinHash => settings.get('pinHash') as String?;
   set pinHash(String? v) => settings.put('pinHash', v);
+
+  /// Salted, iterated hash ("v2$salt$hash"); old installs stored a bare SHA-256.
+  static String _pinDigest(String pin, String salt) {
+    List<int> h = utf8.encode('$salt:$pin');
+    for (var i = 0; i < 20000; i++) {
+      h = sha256.convert([...h, ...utf8.encode(salt)]).bytes;
+    }
+    return base64Url.encode(h);
+  }
+
+  void setPin(String pin) {
+    final salt = newId();
+    pinHash = 'v2\$$salt\$${_pinDigest(pin, salt)}';
+  }
+
+  bool checkPin(String pin) {
+    final stored = pinHash;
+    if (stored == null) return false;
+    if (stored.startsWith('v2\$')) {
+      final parts = stored.split('\$');
+      return parts.length == 3 && _pinDigest(pin, parts[1]) == parts[2];
+    }
+    if (sha256.convert(utf8.encode(pin)).toString() == stored) {
+      setPin(pin); // upgrade an old hash on the first successful unlock
+      return true;
+    }
+    return false;
+  }
   ThemeMode get themeMode {
     switch (settings.get('themeMode') as String?) {
       case 'light': return ThemeMode.light;

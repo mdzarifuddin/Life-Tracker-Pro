@@ -4,13 +4,12 @@
 
 ### Manage Tuition, Finance, Study & Family — From One Place
 
-A premium, offline-first **personal life-management system** for private tutors, university students, MSc researchers, and government-job aspirants in Bangladesh.
+A premium, **offline-first personal life-management app** for private tutors, university students, MSc researchers and government-job aspirants in Bangladesh.
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.11x-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Flutter](https://img.shields.io/badge/Flutter-3.41-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Storage](https://img.shields.io/badge/storage-Hive%20(offline)-F5A623)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-planning-orange.svg)]()
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)]()
 
 </div>
 
@@ -18,84 +17,52 @@ A premium, offline-first **personal life-management system** for private tutors,
 
 ## ✨ What is Life Tracker Pro?
 
-Life Tracker Pro is **not** just a tuition app — it is a **personal academic, finance & life operating system**. It unifies the four things a working tutor-student juggles every day:
+Life Tracker Pro is **not** just a tuition app — it is a personal academic, finance and life organiser. It brings together what a working tutor-student juggles every day:
 
 | 🎓 Tutor Management | 💰 Personal Finance | 🚀 Career & Study | 🛒 Family & Home |
 | :--- | :--- | :--- | :--- |
-| Students, class logs, schedules, exams, fee collection | Income, expense, savings, assets, goals (PIN-locked vault) | Govt-job prep tracker, MSc thesis tracker, AI lesson planner | Shared bazar & future-needs lists your family edits in real time |
+| Students, class logs, schedule, exams, fees | Income, expense, accounts (PIN-locked vault) | Govt-job prep, MSc thesis tracker, tasks | Bazar and future-needs lists |
 
-> **Vision:** Open the app and instantly know — *who you're teaching today, what you taught last class, whose fee is due, how much money you have, and where your thesis and job-prep progress stand.* No mental load. No scattered notebooks.
+> Open the app and instantly know — *who you're teaching today, what you taught last class, whose fee is due, how much money you have, and where your thesis and job-prep stand.*
 
----
-
-## 🎯 Who is it for?
-
-- **Private tutors** who manage many students and need fast, zero-friction class logging and fee tracking.
-- **University & MSc students** tracking thesis stages and deadlines.
-- **Govt-job aspirants** (BCS / Bank / NTRCA) tracking daily MCQ targets and study progress.
-- **Anyone** who wants a private, encrypted personal-finance vault (Monefy-style) alongside their work data.
+Everything is stored **on your phone**. No account, no server, no internet needed.
 
 ---
 
-## 🧩 Core Modules
+## 🧩 Features
 
-| # | Module | What it does |
-|:-:|:-------|:-------------|
-| 1 | **Dashboard** | At-a-glance day: today's classes, month income, pending fees, study progress, quick actions. |
-| 2 | **Students** | Rich student profiles — class, institution, subjects, guardian info, weak topics, fee. |
-| 3 | **Class Logbook** ⭐ | 30-second post-class entry: topics, homework, performance + **voice-to-text**. Auto "last class summary". |
-| 4 | **Schedule** | Google-Calendar-style day/week/month view with **conflict detection** and class reminders. |
-| 5 | **Exam Tracker** | Student-wise exam calendar with countdown notifications ("Physics exam in 3 days"). |
-| 6 | **Payment Tracker** | Paid / Pending / Partial status per student; paying a fee **auto-posts income** to Finance. |
-| 7 | **Finance Vault** 🔒 | Monefy-inspired, PIN/biometric-locked private vault: income, expense, savings, assets, goals, project costs. |
-| 8 | **Govt Job Prep** | Subject-wise daily MCQ targets and progress charts. |
-| 9 | **MSc Thesis Tracker** | Stage-based progress (Lit Review → Defense) with deadline reminders. |
-| 10 | **Reports** | Monthly income/expense, payment reports, study progress — export to PDF / Excel / CSV. |
-| 11 | **Shopping & Family Lists** 🛒 | Shared **bazar** (grocery) list + **future-needs** list. Sign in with Google; your wife/family edit the same list in **real time**. Completing a trip auto-logs the expense to Finance. |
-| 12 | **AI Assistant** *(Phase 2)* | AI lesson planner, finance insights, OCR receipt scanning. |
-| 13 | **Settings** | Theme (dark default), notifications, backup, security, language (বাংলা / English). |
+### Tuition
+- **Students** — rich profiles (class, institution, subjects, teaching days, card colour, photo), any number of **guardians** with one-tap **call / SMS / WhatsApp**, batches, current / previous status.
+- **Class log** — topics, homework, what the student learned, weak points, next plan, performance. Shows a "last class" summary.
+- **Add many classes at once** ⭐ — paste your notes and every class is added automatically:
+  ```
+  Jan_26:
+  Labib - 3,5,8,16,17,19,28,31
+  Done - 12            ← money lines are ignored
+  Sara, farin & rifat - 1,3,5,7
+  ```
+  Understands month headers (`Jan_26:`, `March_26:`, `Sept_26 :`), several students on one line, and stray symbols. Shows a preview first, skips days that are already logged, and can create students that don't exist yet (dated from their first class).
+- **Busy times** — note when a student can't take classes (School, College, Coaching, Private tutor, Other…). The schedule warns you about a clash before you save a class.
+- **Schedule** — weekly timetable with **conflict detection**, one-off booked classes, absences and routine pictures.
+- **Exam tracker** — student-wise exams with countdowns.
+- **Payments** — per-student, per-billing-cycle fee status (Paid / Partial / Due):
+  - monthly fee, pro-rated by classes taught, or **pay per class**;
+  - custom billing day, partial payments (installments) with dates, "pay for some classes";
+  - unpaid or advance amounts **carry forward** automatically;
+  - each row shows the class count, amount to receive, what is paid and what is still due;
+  - undo for a payment. Tuition payments stay in the student's records and **do not touch Finance**.
 
----
+### Finance 🔒
+- Monefy-style income / expense entry with category bubbles and custom categories, monthly donut chart, swipe-to-delete.
+- **PIN-locked vault** (salted hash) with biometric unlock, accounts, and a hidden-balance mode.
 
-## 🎨 Design Philosophy
+### Career & life
+- **Govt job prep**, **MSc thesis** stages and deadlines, **tasks**, and **family lists** (bazar with "Complete Trip" → expense, future needs).
 
-> **Clean · Fast · Premium · One-hand use · Zero clutter**
-
-Inspired by **Monefy** (finance UX), **Notion** (calm, modular layout), and **Google Calendar** (scheduling). Dark mode by default, fluid 3-second data entry, and a focused bottom-navigation flow.
-
-See **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** for the full color palette, typography scale, spacing tokens, and component specs.
-
----
-
-## 🏗️ High-Level Architecture
-
-```
-            ┌──────────────────────────────┐
-            │       Flutter Mobile App      │
-            │  (Riverpod · GoRouter · Drift)│
-            │      Offline-first cache      │
-            └───────────────┬──────────────┘
-                            │  REST / HTTPS (JWT)
-                            ▼
-            ┌──────────────────────────────┐
-            │        FastAPI Backend        │
-            │   Auth · Sync · AI gateway    │
-            └───────┬───────────┬──────────┘
-                    │           │
-        ┌───────────▼──┐   ┌────▼─────────┐   ┌──────────────┐
-        │  PostgreSQL  │   │    Redis     │   │   Firebase   │
-        │ (system of   │   │ (cache/queue)│   │ Auth · FCM   │
-        │   record)    │   └──────────────┘   │ Crashlytics  │
-        └──────────────┘                      └──────────────┘
-                    │
-                    ▼
-        ┌──────────────────────────────┐
-        │   AI Layer (Gemini / OpenAI)  │
-        │ Lesson plans · Finance insight│
-        └──────────────────────────────┘
-```
-
-**Offline-first:** the app is fully usable with no network. Local **Drift (SQLite)** is the working store; changes sync to the FastAPI/PostgreSQL backend when online. Full details in **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+### Data & safety
+- **Backup, export, import and share** everything as one JSON file (Settings → Backup): save to device, share (WhatsApp, Drive…), or import — with a safety copy taken first and the file validated before anything is replaced. The vault PIN is never included in a backup.
+- **In-app updater** — checks GitHub Releases and installs new versions.
+- Dark (default), light or system theme; Material 3 design.
 
 ---
 
@@ -103,133 +70,82 @@ See **[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)** for the full color palett
 
 | Layer | Technology |
 |:------|:-----------|
-| **Mobile** | Flutter 3.x · Dart |
-| **State** | Riverpod (with code-gen) |
-| **Navigation** | GoRouter |
-| **Local DB** | Drift (SQLite) — relational, type-safe, offline-first |
-| **Local secure store** | `flutter_secure_storage` + SQLCipher for the vault |
-| **Backend** | FastAPI (Python) · SQLAlchemy 2.0 · Alembic |
-| **Database** | PostgreSQL 16 |
-| **Cache/Queue** | Redis |
-| **Auth** | Firebase Auth (Email + **Google Sign-In**) + JWT |
-| **Real-time collaboration** | Cloud Firestore (shared family lists, live sync, offline) |
-| **Notifications** | Firebase Cloud Messaging + local notifications |
-| **AI** | Gemini API (pluggable) |
-| **Charts** | `fl_chart` |
-| **CI/CD** | GitHub Actions |
-| **Deploy** | Docker · Oracle Cloud Free Tier / AWS EC2 |
-| **Observability** | Firebase Analytics + Crashlytics |
+| App | Flutter 3.41 (pinned in CI) · Dart 3.11 |
+| State | Riverpod 3 |
+| Navigation | go_router |
+| Storage | Hive (offline boxes) |
+| Charts | fl_chart |
+| Sharing / files | share_plus · file_picker · path_provider |
+| Contacts / calls | url_launcher · flutter_native_contact_picker |
+| Security | crypto (PIN hashing) · local_auth (biometrics) |
+| CI/CD | GitHub Actions — a `v*` tag builds a signed APK and publishes a Release |
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-life-tracker-pro/
-├── app/                        # Flutter application
-│   └── lib/
-│       ├── core/               # theme, router, di, utils, network, db
-│       ├── features/
-│       │   ├── dashboard/
-│       │   ├── students/
-│       │   ├── class_logbook/
-│       │   ├── schedule/
-│       │   ├── exams/
-│       │   ├── payments/
-│       │   ├── finance/        # the private vault
-│       │   ├── jobprep/
-│       │   ├── thesis/
-│       │   ├── lists/          # shared bazar + future-needs lists
-│       │   ├── reports/
-│       │   └── settings/
-│       └── main.dart
-├── backend/                    # FastAPI service
-│   ├── app/
-│   │   ├── api/                # routers
-│   │   ├── models/             # SQLAlchemy models
-│   │   ├── schemas/            # Pydantic schemas
-│   │   ├── services/
-│   │   └── core/               # config, security, db session
-│   ├── alembic/                # migrations
-│   └── Dockerfile
-├── docs/
-│   ├── PRD.md                  # product requirements + every screen
-│   ├── ARCHITECTURE.md         # system + Flutter clean architecture
-│   ├── DATABASE.md             # full schema + ERD
-│   └── DESIGN_SYSTEM.md        # colors, type, components, finance UX
-├── docker-compose.yml
+.
+├── app/                    # Flutter application
+│   ├── lib/
+│   │   ├── main.dart       # boot: Hive init, ProviderScope
+│   │   ├── app.dart        # router, shell, bottom navigation
+│   │   ├── models.dart     # data models (Map (de)serialisation)
+│   │   ├── core/           # theme, data (Repo over Hive), backup, updater, widgets
+│   │   └── features/       # dashboard, students, schedule, payments, finance,
+│   │                       # exams, jobprep, thesis, tasks, lists, settings, more
+│   └── test/               # unit and import/backup tests
+├── docs/                   # PRD, architecture, database and design-system notes
+│                           # (planning documents; the app itself is offline-only)
+├── .github/workflows/      # release pipeline
 └── README.md
 ```
-
-Each Flutter feature follows **Clean Architecture**: `presentation/` (UI + Riverpod controllers) → `domain/` (entities + use cases) → `data/` (repositories + Drift/remote sources).
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Flutter SDK 3.x · Dart 3.x
-- Python 3.11+
-- Docker + Docker Compose (for backend + DB)
-- A Firebase project (Auth + FCM)
+**Prerequisites:** Flutter 3.41+ · Android SDK (or a device / emulator).
 
-### 1. Backend (Docker)
-```bash
-cd backend
-cp .env.example .env          # set DB url, JWT secret, Gemini key
-docker compose up --build     # starts FastAPI + PostgreSQL + Redis
-# API docs at http://localhost:8000/docs
-```
-
-### 2. Database migrations
-```bash
-docker compose exec api alembic upgrade head
-```
-
-### 3. Flutter app
 ```bash
 cd app
 flutter pub get
-dart run build_runner build --delete-conflicting-outputs   # Drift + Riverpod codegen
-flutter run                                                 # pick your device
+flutter run                 # pick your device or emulator
+flutter test                # unit tests
+flutter analyze
 ```
 
-> The app runs **fully offline** out of the box. Backend sync activates once you sign in and configure the API base URL in **Settings → Backup**.
+### Releasing
+```bash
+# bump `version:` in app/pubspec.yaml, commit, then
+git tag v1.3.0
+git push origin v1.3.0      # CI builds the signed APK and creates the Release
+```
+The installed app's updater then offers the new version. Signing secrets must be set in the repository settings (the workflow checks for them).
 
 ---
 
 ## 🗺️ Roadmap
 
-| Phase | Focus | Highlights |
-|:-----:|:------|:-----------|
-| **v1.0 — MVP** | Local-first core | Dashboard, Students, Class Logbook, Schedule, Payments, Finance Vault, Exams, Job-prep, Thesis, Settings — all offline. |
-| **v1.1 — Sync & Sharing** | Cloud | FastAPI/PostgreSQL sync, JWT auth, multi-device, daily backup, **Google Sign-In + real-time shared family lists**. |
-| **v1.2 — Reports** | Insights | PDF/Excel/CSV export, monthly financial dashboard, analytics. |
-| **v2.0 — AI** | Intelligence | AI lesson planner, finance insights, voice-note logging, OCR receipt scanner. |
-| **v2.1 — Guardian Portal** | Sharing | Parents view attendance / homework / results; WhatsApp auto-reports. |
-| **v3.0 — Public launch** | Scale | Play Store release as *"Life Tracker Pro Bangladesh"* for other tutors. |
+Done: tuition, class logs, bulk class paste, schedule with conflicts, busy times, payments, finance vault, exams, job prep, thesis, tasks, lists, JSON backup / import / share, in-app updater.
 
-Full breakdown in **[docs/PRD.md](docs/PRD.md)**.
+Ideas next:
+- Fee reminders to guardians, receipts, and an "overdue first" fee view
+- Free-slot finder for the schedule
+- Automatic scheduled backups
+- PDF / Excel monthly report export
+- Home-screen widget · বাংলা language
+- Cloud sync and shared family lists (optional, later)
 
----
-
-## 📚 Documentation
-
-| Doc | Description |
-|:----|:------------|
-| [**PRD.md**](docs/PRD.md) | Product requirements — every screen, user flow, and acceptance criteria. |
-| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md) | System design, Flutter clean architecture, offline sync, security model. |
-| [**DATABASE.md**](docs/DATABASE.md) | Complete schema, ERD, and table definitions. |
-| [**DESIGN_SYSTEM.md**](docs/DESIGN_SYSTEM.md) | Color tokens, typography, spacing, components, Monefy-style finance UX. |
+The longer-term design notes in [`docs/`](docs/) describe a possible cloud backend; none of it is required to use the app.
 
 ---
 
 ## 🔐 Privacy & Security
 
-- The **Finance Vault** is a separate, encrypted area locked behind **PIN + biometrics**.
-- Vault data is stored in an **SQLCipher-encrypted** local database; balances support a **hidden mode** (`৳ ******`, tap to reveal).
-- Student/guardian PII is encrypted at rest and never leaves the device unless cloud sync is enabled.
-- **Shared lists are fully separate from the private vault** — only invited Google accounts can see a shared list, and no finance/vault data is ever shared.
+- All data stays on the device unless **you** export or share a backup.
+- The Finance Vault is behind a PIN (salted hash) and optional biometrics; balances can be hidden.
+- Backups never contain the vault PIN.
 
 ---
 

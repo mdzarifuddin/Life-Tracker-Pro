@@ -133,18 +133,7 @@ class HomeShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragEnd: (d) {
-          final v = d.primaryVelocity ?? 0;
-          if (v < -250 && shell.currentIndex < 4) {
-            shell.goBranch(shell.currentIndex + 1);
-          } else if (v > 250 && shell.currentIndex > 0) {
-            shell.goBranch(shell.currentIndex - 1);
-          }
-        },
-        child: shell,
-      ),
+      body: shell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: true),

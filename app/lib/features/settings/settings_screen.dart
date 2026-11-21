@@ -7,7 +7,6 @@ import '../../core/providers.dart';
 import '../../core/updater.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
-import '../finance/finance_screen.dart' show hashPin;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -60,22 +59,60 @@ class SettingsScreen extends ConsumerWidget {
             const SectionTitle('Backup'),
             Card(child: Column(children: [
               ListTile(
-                leading: const Icon(Icons.upload_file, color: AppColors.income),
-                title: const Text('Export backup'),
-                subtitle: const Text('Save all data to a file (upload to Google Drive)'),
+                leading: const Icon(Icons.save_alt, color: AppColors.income),
+                title: const Text('Save backup to device'),
+                subtitle: const Text('All data as one JSON file, saved where you choose'),
                 onTap: () async {
-                  await exportBackup(ref.read(repoProvider));
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    final path = await saveBackupToDevice(ref.read(repoProvider));
+                    messenger.showSnackBar(SnackBar(
+                        content: Text(path == null ? 'Save cancelled' : 'Backup saved')));
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text("Couldn't save backup: $e")));
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share, color: AppColors.income),
+                title: const Text('Share backup'),
+                subtitle: const Text('Send the JSON file via WhatsApp, Google Drive, email…'),
+                onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await exportBackup(ref.read(repoProvider));
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text("Couldn't share backup: $e")));
+                  }
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.download, color: AppColors.savings),
                 title: const Text('Import backup'),
-                subtitle: const Text('Restore all data from a backup file'),
+                subtitle: const Text('Restore all data from a backup file (replaces current data)'),
                 onTap: () async {
-                  final ok = await importBackup(ref.read(repoProvider));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  final messenger = ScaffoldMessenger.of(context);
+                  final go = await showDialog<bool>(
+                    context: context,
+                    builder: (c) => AlertDialog(
+                      title: const Text('Restore a backup?'),
+                      content: const Text('This replaces everything in the app with the backup. '
+                          'A safety copy of your current data is kept automatically.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Choose file')),
+                      ],
+                    ),
+                  );
+                  if (go != true) return;
+                  try {
+                    final ok = await importBackup(ref.read(repoProvider));
+                    messenger.showSnackBar(SnackBar(
                         content: Text(ok ? 'Data imported. Restart the app to apply everything.' : 'Import cancelled')));
+                  } on FormatException catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text("Couldn't import: $e")));
                   }
                 },
               ),
@@ -129,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (pin != null && pin.length >= 4) {
-      ref.read(repoProvider).pinHash = hashPin(pin);
+      ref.read(repoProvider).setPin(pin);
       ref.read(vaultProvider.notifier).unlock();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

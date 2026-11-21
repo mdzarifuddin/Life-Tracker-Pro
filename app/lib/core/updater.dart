@@ -110,6 +110,11 @@ Future<void> installLatestVersion(BuildContext context) async {
 Future<void> downloadAndInstall(UpdateInfo info, void Function(double) onProgress) async {
   final dir = await getExternalStorageDirectory() ?? await getTemporaryDirectory();
   final file = File('${dir.path}/life_tracker_pro_${info.version}.apk');
+  try {
+    for (final e in dir.listSync()) {
+      if (e is File && e.path.contains("life_tracker_pro_") && e.path.endsWith(".apk") && e.path != file.path) e.deleteSync();
+    }
+  } catch (_) {}
   final client = http.Client();
   try {
     final resp = await client.send(http.Request('GET', Uri.parse(info.url)));
@@ -179,7 +184,7 @@ void autoUpdateOnce(BuildContext context) {
   _autoChecked = true;
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     final s = await refreshVersionStatus();
-    if (s.updateAvailable && context.mounted) runUpdateCheck(context, silent: true);
+    if (s.updateAvailable && s.latest != null && context.mounted) _promptUpdate(context, s.latest!);
   });
 }
 
@@ -195,6 +200,10 @@ Future<void> runUpdateCheck(BuildContext context, {bool silent = false}) async {
     }
     return;
   }
+  _promptUpdate(context, info);
+}
+
+void _promptUpdate(BuildContext context, UpdateInfo info) {
   showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
