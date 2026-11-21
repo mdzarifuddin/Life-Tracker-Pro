@@ -1,48 +1,40 @@
-# Life Tracker Pro — Flutter App (Phase 1 MVP)
+# Life Tracker Pro — Flutter App
 
-Local-first implementation of the Life Tracker Pro spec (see `../docs/`). Runs fully offline; no backend required.
+Offline-first Flutter app (see the repository root `README.md` for the full feature list). No backend or account is needed.
 
 ## Stack
-- **Flutter** · **Riverpod** (state) · **GoRouter** (navigation)
-- **Hive** (local storage — chosen for the MVP so it runs on Android/web/desktop with no codegen; Drift remains the documented target for the cloud phase)
-- **fl_chart** (finance donut) · **crypto** (vault PIN hashing) · **intl**
+- **Flutter 3.41** · **Riverpod 3** · **go_router**
+- **Hive** for local storage (no code generation)
+- fl_chart · share_plus · file_picker · url_launcher · local_auth · crypto · intl
 
 ## Run
 ```bash
 flutter pub get
-
-# Android emulator (primary target)
-flutter run -d emulator-5554        # or: flutter run  (then pick a device)
-
-# Quick preview in the browser
-flutter run -d chrome
+flutter run                  # choose a device / emulator
+flutter test
+flutter analyze
 ```
-
-## What works (Phase 1)
-- **Dashboard** — today's classes, month income/expense, pending fees, thesis & job-prep progress, upcoming exams.
-- **Students** — list + search, add/edit, profile with class-log history & last-class summary.
-- **Class Logbook** — topics, homework, performance slider, remarks.
-- **Schedule** — weekly timetable with **conflict detection**.
-- **Finance** — Monefy-style add expense/income (category bubbles + custom categories), monthly donut, swipe-to-delete, **PIN-locked vault**.
-- **Payments** — per-student fee status; **marking paid auto-creates the income transaction**.
-- **Exam Tracker · Govt Job Prep · MSc Thesis** trackers.
-- **Family Lists** — bazar (quick-add items + "Complete Trip" → auto expense) and future-needs lists (local; real-time Google sharing is the v1.1 target).
-- **Settings** — theme (dark default / light / system), vault PIN set/remove.
 
 ## Project layout
 ```
 lib/
-├── main.dart            # boot: Hive init + seed, ProviderScope
-├── app.dart             # MaterialApp.router, shell + bottom nav + Quick Add
-├── models.dart          # data models (Map (de)serialization)
+├── main.dart            # boot: Hive init, ProviderScope
+├── app.dart             # router, shell, bottom navigation, quick add
+├── models.dart          # data models (Map (de)serialisation)
 ├── core/
-│   ├── theme.dart       # design tokens (DESIGN_SYSTEM.md), money/date format
-│   ├── data.dart        # Repo over Hive boxes (+ reactive listenables, seeding)
-│   ├── providers.dart   # repo / themeMode / month / vault providers
-│   └── widgets.dart     # shared UI (cards, stat, progress, empty state)
-└── features/<module>/   # dashboard, students, schedule, finance, payments,
-                         # exams, jobprep, thesis, lists, settings, more
+│   ├── theme.dart       # design tokens, money/date formatting
+│   ├── data.dart        # Repo over Hive boxes, fee maths, backup import/export
+│   ├── backup.dart      # save / share / import JSON backups
+│   ├── bulk_classes.dart# parser for "Jan_26: Name - 3,5,8" class notes
+│   ├── updater.dart     # GitHub Releases in-app updater
+│   ├── providers.dart
+│   └── widgets.dart     # shared UI
+└── features/            # dashboard, students, schedule, payments, finance,
+                         # exams, jobprep, thesis, tasks, lists, settings, more
+test/                    # fee, backup/import and bulk-class parser tests
 ```
 
-## Verified
-`flutter analyze` → no issues · `flutter test` → passing · `flutter build web` → builds.
+## Notes
+- Backups are JSON (`_app: life_tracker_pro`, `_version`), validated and staged before import; the vault PIN is not exported.
+- Tuition payments live in the student's records and never create Finance transactions.
+- CI pins Flutter 3.41.4; a `v*` tag builds a signed APK and a GitHub Release (`.github/workflows/release.yml`).
