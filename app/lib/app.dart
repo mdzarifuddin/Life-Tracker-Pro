@@ -37,6 +37,7 @@ final _router = GoRouter(
             builder: (c, s) => const StudentsScreen(),
             routes: [
               GoRoute(path: 'payments', builder: (c, s) => const PaymentsScreen()),
+              GoRoute(path: 'history', builder: (c, s) => const HistoryScreen()),
               GoRoute(path: 'exams', builder: (c, s) => const ExamsScreen()),
               GoRoute(
                 path: ':id',
@@ -62,7 +63,6 @@ final _router = GoRouter(
               GoRoute(path: 'jobprep', builder: (c, s) => const JobPrepScreen()),
               GoRoute(path: 'thesis', builder: (c, s) => const ThesisScreen()),
               GoRoute(path: 'lists', builder: (c, s) => const ListsScreen()),
-              GoRoute(path: 'history', builder: (c, s) => const HistoryScreen()),
               GoRoute(path: 'settings', builder: (c, s) => const SettingsScreen()),
             ],
           ),

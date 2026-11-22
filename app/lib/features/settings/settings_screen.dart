@@ -63,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
                 leading: const Icon(Icons.history, color: AppColors.savings),
                 title: const Text('Tuition history (JSON)'),
                 subtitle: const Text('All classes and payments per student: view, export, import'),
-                onTap: () => context.go('/more/history'),
+                onTap: () => context.push('/students/history'),
               ),
               ListTile(
                 leading: const Icon(Icons.save_alt, color: AppColors.income),

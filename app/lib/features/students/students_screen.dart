@@ -92,6 +92,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               icon: const Icon(Icons.payments_outlined, size: 18),
               label: const Text('Pay')),
           TextButton.icon(
+              onPressed: () => context.push('/students/history'),
+              icon: const Icon(Icons.history, size: 18),
+              label: const Text('History')),
+          TextButton.icon(
               onPressed: () => context.push('/students/exams'),
               icon: const Icon(Icons.event_note, size: 18),
               label: const Text('Exams')),

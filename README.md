@@ -43,7 +43,7 @@ Everything is stored **on your phone**. No account, no server, no internet neede
   ```
   Understands month headers (`Jan_26:`, `March_26:`, `Sept_26 :`), several students on one line, and stray symbols. Shows a preview first, skips days that are already logged, and can create students that don't exist yet (dated from their first class).
 - **Mark classes paid** — tick a payment per class date, or say "payment done till 22-Nov-2026" and every class up to that date is marked paid (shown in a different colour). From Log Class, the student page, or while bulk-adding. Stays in the student records, never in Finance.
-- **Tuition history** — one screen with every student, class and payment (More → Tuition History), and export / import it all as a readable JSON file (by student: class dates, paid flags, payments). Importing twice never duplicates anything.
+- **Tuition history** — one screen with every student, class and payment (Tuition tab → History), and export / import it all as a readable JSON file (by student: class dates, paid flags, payments). Importing twice never duplicates anything.
 - **Busy times** — note when a student can't take classes (School, College, Coaching, Private tutor, Other…). The schedule warns you about a clash before you save a class.
 - **Schedule** — weekly timetable with **conflict detection**, one-off booked classes, absences and routine pictures.
 - **Exam tracker** — student-wise exams with countdowns.
