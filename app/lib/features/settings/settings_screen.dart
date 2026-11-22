@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/backup.dart';
 import '../../core/providers.dart';
@@ -58,6 +59,12 @@ class SettingsScreen extends ConsumerWidget {
             Gap.l,
             const SectionTitle('Backup'),
             Card(child: Column(children: [
+              ListTile(
+                leading: const Icon(Icons.history, color: AppColors.savings),
+                title: const Text('Tuition history (JSON)'),
+                subtitle: const Text('All classes and payments per student: view, export, import'),
+                onTap: () => context.go('/more/history'),
+              ),
               ListTile(
                 leading: const Icon(Icons.save_alt, color: AppColors.income),
                 title: const Text('Save backup to device'),

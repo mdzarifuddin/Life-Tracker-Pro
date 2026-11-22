@@ -96,6 +96,29 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Expanded(child: _stat('Received', taka(received), Icons.payments, AppColors.warning)),
                 ]),
                 Gap.m,
+                Row(children: [
+                  Expanded(child: FilledButton.icon(
+                    icon: const Icon(Icons.ios_share, size: 18),
+                    label: const Text('Export'),
+                    onPressed: () => shareHistory(repo),
+                  )),
+                  Gap.s,
+                  Expanded(child: OutlinedButton.icon(
+                    icon: const Icon(Icons.save_alt, size: 18),
+                    label: const Text('Save'),
+                    onPressed: () async {
+                      final p = await saveHistoryToDevice(repo);
+                      if (p != null) _msg('History saved');
+                    },
+                  )),
+                  Gap.s,
+                  Expanded(child: OutlinedButton.icon(
+                    icon: const Icon(Icons.file_open, size: 18),
+                    label: const Text('Import'),
+                    onPressed: () => _import(repo),
+                  )),
+                ]),
+                Gap.m,
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
                   segments: const [
