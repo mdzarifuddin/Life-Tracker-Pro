@@ -38,7 +38,7 @@ class IconBadge extends StatelessWidget {
           color: color.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(size * 0.32),
         ),
-        child: Icon(icon, color: color, size: size * 0.55),
+        child: Icon(icon, color: readableOn(context, color), size: size * 0.55),
       );
 }
 
@@ -155,7 +155,7 @@ class PadCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: onTap,
-          child: Padding(padding: padding ?? const EdgeInsets.all(16), child: child),
+          child: Padding(padding: padding ?? const EdgeInsets.all(12), child: child),
         ),
       ),
     );
@@ -175,11 +175,11 @@ class StatCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              if (icon != null) ...[Icon(icon, size: 16, color: color), const SizedBox(width: 6)],
+              if (icon != null) ...[Icon(icon, size: 16, color: readableOn(context, color)), const SizedBox(width: 6)],
               Flexible(child: Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor))),
             ]),
             const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: readableOn(context, color))),
           ],
         ),
       );
@@ -225,7 +225,7 @@ class ProgressRow extends StatelessWidget {
         children: [
           Row(children: [
             Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
-            Text('$percent%', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+            Text('$percent%', style: TextStyle(color: readableOn(context, color), fontWeight: FontWeight.bold)),
           ]),
           const SizedBox(height: 6),
           ClipRRect(
@@ -274,9 +274,9 @@ class InfoChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 13, color: c),
+        Icon(icon, size: 13, color: readableOn(context, c)),
         const SizedBox(width: 5),
-        Text(text, style: TextStyle(fontSize: 12, color: c, fontWeight: FontWeight.w600)),
+        Text(text, style: TextStyle(fontSize: 12, color: readableOn(context, c), fontWeight: FontWeight.w600)),
       ]),
     );
   }
@@ -288,4 +288,14 @@ String minutesToTime(int m) {
   final period = h >= 12 ? 'PM' : 'AM';
   final h12 = h % 12 == 0 ? 12 : h % 12;
   return '$h12:${mm.toString().padLeft(2, '0')} $period';
+}
+
+/// A foreground colour that stays readable on the app background: dark, saturated colours
+/// (indigo, blue…) are lightened in dark mode and deepened in light mode.
+Color readableOn(BuildContext context, Color c) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final l = c.computeLuminance();
+  if (dark && l < 0.30) return Color.lerp(c, Colors.white, 0.55)!;
+  if (!dark && l > 0.35) return Color.lerp(c, Colors.black, 0.35)!;
+  return c;
 }

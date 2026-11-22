@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data.dart';
 import '../../core/history.dart';
+import '../../core/l10n.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -35,7 +36,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     } on FormatException catch (e) {
       _msg(e.message);
     } catch (_) {
-      _msg('Could not read that file');
+      _msg(tr('Could not read that file'));
     }
   }
 
@@ -44,7 +45,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final repo = ref.read(repoProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tuition history'),
+        title: Text(tr('Tuition history')),
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) async {
@@ -52,15 +53,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 await shareHistory(repo);
               } else if (v == 'save') {
                 final p = await saveHistoryToDevice(repo);
-                if (p != null) _msg('History saved');
+                if (p != null) _msg(tr('History saved'));
               } else {
                 await _import(repo);
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.ios_share), title: Text('Share as JSON'))),
-              PopupMenuItem(value: 'save', child: ListTile(leading: Icon(Icons.save_alt), title: Text('Save JSON to device'))),
-              PopupMenuItem(value: 'import', child: ListTile(leading: Icon(Icons.file_open), title: Text('Import JSON'))),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'share', child: ListTile(leading: const Icon(Icons.ios_share), title: Text(tr('Share as JSON')))),
+              PopupMenuItem(value: 'save', child: ListTile(leading: const Icon(Icons.save_alt), title: Text(tr('Save JSON to device')))),
+              PopupMenuItem(value: 'import', child: ListTile(leading: const Icon(Icons.file_open), title: Text(tr('Import JSON')))),
             ],
           ),
         ],
@@ -85,45 +86,45 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
                 Row(children: [
-                  Expanded(child: _stat('Students', '${students.length}', Icons.people, AppColors.primary)),
+                  Expanded(child: _stat(tr('Students'), '${students.length}', Icons.people, AppColors.primary)),
                   Gap.s,
-                  Expanded(child: _stat('Classes', '$classes', Icons.menu_book, AppColors.income)),
+                  Expanded(child: _stat(tr('Classes'), '$classes', Icons.menu_book, AppColors.income)),
                 ]),
                 Gap.s,
                 Row(children: [
-                  Expanded(child: _stat('Paid classes', '$paidClasses', Icons.check_circle, paidClassColor)),
+                  Expanded(child: _stat(tr('Paid classes'), '$paidClasses', Icons.check_circle, paidClassColor)),
                   Gap.s,
-                  Expanded(child: _stat('Received', taka(received), Icons.payments, AppColors.warning)),
+                  Expanded(child: _stat(tr('Received'), taka(received), Icons.payments, AppColors.warning)),
                 ]),
                 Gap.m,
                 Row(children: [
                   Expanded(child: FilledButton.icon(
                     icon: const Icon(Icons.ios_share, size: 18),
-                    label: const Text('Export'),
+                    label: Text(tr('Export')),
                     onPressed: () => shareHistory(repo),
                   )),
                   Gap.s,
                   Expanded(child: OutlinedButton.icon(
                     icon: const Icon(Icons.save_alt, size: 18),
-                    label: const Text('Save'),
+                    label: Text(tr('Save')),
                     onPressed: () async {
                       final p = await saveHistoryToDevice(repo);
-                      if (p != null) _msg('History saved');
+                      if (p != null) _msg(tr('History saved'));
                     },
                   )),
                   Gap.s,
                   Expanded(child: OutlinedButton.icon(
                     icon: const Icon(Icons.file_open, size: 18),
-                    label: const Text('Import'),
+                    label: Text(tr('Import')),
                     onPressed: () => _import(repo),
                   )),
                 ]),
                 Gap.m,
                 SegmentedButton<bool>(
                   showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('By student'), icon: Icon(Icons.person)),
-                    ButtonSegment(value: true, label: Text('Timeline'), icon: Icon(Icons.timeline)),
+                  segments: [
+                    ButtonSegment(value: false, label: Text(tr('By student')), icon: const Icon(Icons.person)),
+                    ButtonSegment(value: true, label: Text(tr('Timeline')), icon: const Icon(Icons.timeline)),
                   ],
                   selected: {_timeline},
                   onSelectionChanged: (v) => setState(() => _timeline = v.first),
@@ -132,11 +133,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 TextField(
                   controller: _search,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(hintText: 'Search student', prefixIcon: Icon(Icons.search)),
+                  decoration: InputDecoration(hintText: tr('Search student'), prefixIcon: const Icon(Icons.search)),
                 ),
                 Gap.m,
                 if (students.isEmpty)
-                  const EmptyState(icon: Icons.history, message: 'No students yet.')
+                  EmptyState(icon: Icons.history, message: tr('No students yet.'))
                 else if (_timeline)
                   ..._timelineRows(context, repo, shown, logs)
                 else
@@ -189,16 +190,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           child: ExpansionTile(
             leading: InitialAvatar(s.name),
             title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('${logs.length} classes · $paid paid · ${taka(received)} received',
+            subtitle: Text(tr('{n} classes · {p} paid · {a} received', {'n': logs.length, 'p': paid, 'a': taka(received)}),
                 style: TextStyle(color: hint, fontSize: 12.5)),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (logs.isEmpty) Text('No classes yet.', style: TextStyle(color: hint)),
+              if (logs.isEmpty) Text(tr('No classes yet.'), style: TextStyle(color: hint)),
               for (final e in months.entries) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 6, bottom: 4),
-                  child: Text('${monthLabel(DateTime.parse('${e.key}-01'))} · ${e.value.length} classes',
+                  child: Text(tr('{m} · {n} classes', {'m': monthLabel(DateTime.parse('${e.key}-01')), 'n': e.value.length}),
                       style: const TextStyle(fontWeight: FontWeight.w600)),
                 ),
                 Wrap(spacing: 6, runSpacing: 6, children: [
@@ -220,21 +221,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Row(children: [
-                    _dot(AppColors.income), const SizedBox(width: 4), const Text('Taught', style: TextStyle(fontSize: 12)),
+                    _dot(AppColors.income), const SizedBox(width: 4), Text(tr('Taught'), style: const TextStyle(fontSize: 12)),
                     const SizedBox(width: 12),
-                    _dot(paidClassColor), const SizedBox(width: 4), const Text('Paid', style: TextStyle(fontSize: 12)),
+                    _dot(paidClassColor), const SizedBox(width: 4), Text(tr('Paid'), style: const TextStyle(fontSize: 12)),
                   ]),
                 ),
               if (lump.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('Payments', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Payments'), style: const TextStyle(fontWeight: FontWeight.w600)),
                 for (final x in lump)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     leading: const Icon(Icons.payments_outlined, color: AppColors.warning, size: 20),
                     title: Text(taka(x.$2.amount), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text('${fullDate(x.$2.date)} · for ${monthLabel(DateTime.parse('${x.$1.month}-01'))}'),
+                    subtitle: Text(tr('{d} · for {m}', {'d': fullDate(x.$2.date), 'm': monthLabel(DateTime.parse('${x.$1.month}-01'))})),
                   ),
               ],
             ],
@@ -258,7 +259,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       }
     }
     rows.sort((a, b) => b.date.compareTo(a.date));
-    if (rows.isEmpty) return [const EmptyState(icon: Icons.history, message: 'Nothing here yet.')];
+    if (rows.isEmpty) return [EmptyState(icon: Icons.history, message: tr('Nothing here yet.'))];
     return [
       for (final r in rows.take(400))
         ListTile(
@@ -268,7 +269,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             r.isClass ? Icons.menu_book : Icons.payments,
             color: r.isClass ? (r.paid ? paidClassColor : AppColors.income) : AppColors.warning,
           ),
-          title: Text(r.isClass ? '${r.s.name} · class' : '${r.s.name} · payment ${taka(r.amount)}',
+          title: Text(r.isClass ? tr('{s} · class', {'s': r.s.name}) : tr('{s} · payment {a}', {'s': r.s.name, 'a': taka(r.amount)}),
               style: const TextStyle(fontWeight: FontWeight.w600)),
           subtitle: Text(fullDate(r.date), style: TextStyle(color: hint)),
           trailing: r.isClass && r.paid ? const Icon(Icons.check_circle, size: 18, color: paidClassColor) : null,
@@ -276,7 +277,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       if (rows.length > 400)
         Padding(
           padding: const EdgeInsets.all(12),
-          child: Text('Showing the latest 400 of ${rows.length}. Use "By student" or export the JSON for everything.',
+          child: Text(tr('Showing the latest 400 of {n}. Use "By student" or export the JSON for everything.', {'n': rows.length}),
               style: TextStyle(color: hint, fontSize: 12)),
         ),
     ];

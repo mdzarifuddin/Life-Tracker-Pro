@@ -5,7 +5,7 @@ import '../../core/theme.dart';
 import '../../models.dart';
 
 /// Colour used for classes whose payment is done.
-const paidClassColor = AppColors.savings;
+const paidClassColor = Color(0xFFF472B6); // pink: stands out on the blue background
 
 /// Mark a student's classes as paid: "payment done till a date", or tick single days.
 /// Payments are recorded in the student's records only (never in Finance).

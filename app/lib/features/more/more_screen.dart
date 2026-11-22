@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/l10n.dart';
 import '../../core/theme.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -9,17 +10,21 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_MoreItem>[
-      _MoreItem(Icons.checklist, 'My Tasks', 'Personal scheduled to-dos', AppColors.primaryGrad, '/more/tasks'),
-      _MoreItem(Icons.account_balance, 'Govt Job Prep', 'Daily MCQ targets', AppColors.savingsGrad, '/more/jobprep'),
-      _MoreItem(Icons.school, 'MSc Thesis', 'Stage-wise progress', AppColors.primaryGrad, '/more/thesis'),
-      _MoreItem(Icons.shopping_cart, 'Family Lists', 'Bazar & future needs', AppColors.accentGrad, '/more/lists'),
+      _MoreItem(Icons.checklist, tr('My Tasks'), tr('Personal scheduled to-dos'), AppColors.primaryGrad, '/more/tasks'),
+      _MoreItem(Icons.account_balance, tr('Govt Job Prep'), tr('Daily MCQ targets'), AppColors.savingsGrad, '/more/jobprep'),
+      _MoreItem(Icons.school, tr('MSc Thesis'), tr('Stage-wise progress'), AppColors.primaryGrad, '/more/thesis'),
+      _MoreItem(Icons.shopping_cart, tr('Family Lists'), tr('Bazar & future needs'), AppColors.accentGrad, '/more/lists'),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(title: Text(tr('More'))),
       body: SafeArea(
-        child: GridView.count(
-          crossAxisCount: 2,
+        child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+          children: [
+            GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.02,
@@ -50,6 +55,23 @@ class MoreScreen extends StatelessWidget {
                   ),
                 ),
               )).toList(),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                leading: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(gradient: AppColors.hero, borderRadius: BorderRadius.circular(13)),
+                  child: const Icon(Icons.settings, color: Colors.white),
+                ),
+                title: Text(tr('Settings'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                subtitle: Text(tr('App look, language, backup, PIN')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go('/more/settings'),
+              ),
+            ),
+          ],
         ),
       ),
     );

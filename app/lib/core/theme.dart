@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 class AppColors {
   // Brand
   static const primary = Color(0xFF6366F1);
+  /// Readable "link" blue/indigo for text and icons on the app background.
+  static const linkDark = Color(0xFFC3C6FF);
+  static const linkLight = Color(0xFF3438C4);
   static const primaryContainer = Color(0xFF4F46E5);
   static const accent = Color(0xFF22D3EE);
 
@@ -92,12 +95,13 @@ class AppColors {
   static const darkBg = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF241A4D), Color(0xFF15224A), Color(0xFF0E1626)],
+    colors: [Color(0xFF3B2D83), Color(0xFF24408A), Color(0xFF17506A), Color(0xFF1B3F4F)],
   );
   static const lightBg = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFECEDFF), Color(0xFFFBEAF4), Color(0xFFE6F2FF)],
+    colors: [Color(0xFFFFD9EC), Color(0xFFE6D8FF), Color(0xFFFFF3C4), Color(0xFFFFDCEB), Color(0xFFEBDDFF)],
+    stops: [0.0, 0.28, 0.52, 0.76, 1.0],
   );
 
   static const moduleGrads = <LinearGradient>[
@@ -114,9 +118,9 @@ class AppColors {
 class Gap {
   static const xs = SizedBox(height: 4, width: 4);
   static const s = SizedBox(height: 8, width: 8);
-  static const m = SizedBox(height: 12, width: 12);
-  static const l = SizedBox(height: 16, width: 16);
-  static const xl = SizedBox(height: 24, width: 24);
+  static const m = SizedBox(height: 10, width: 10);
+  static const l = SizedBox(height: 12, width: 12);
+  static const xl = SizedBox(height: 18, width: 18);
 }
 
 class AppTheme {
@@ -249,6 +253,9 @@ class AppTheme {
         thickness: 1,
       ),
       listTileTheme: ListTileThemeData(
+        dense: true,
+        visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
+        minVerticalPadding: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -331,6 +338,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 48),
+          foregroundColor: dark ? AppColors.linkDark : AppColors.linkLight,
           side: BorderSide(color: scheme.outline),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -340,6 +348,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: dark ? AppColors.linkDark : AppColors.linkLight,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

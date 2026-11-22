@@ -3,147 +3,150 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/appearance.dart';
 import '../../core/backup.dart';
+import '../../core/l10n.dart';
 import '../../core/providers.dart';
 import '../../core/updater.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import 'background_editor.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  /// Text scale while the slider is being dragged (saved on release).
+  double? _dragScale;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
-    final mode = ref.watch(themeModeProvider);
     final hasPin = repo.pinHash != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(tr('Settings'))),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            const SectionTitle('Appearance'),
-            Card(child: RadioGroup<ThemeMode>(
-              groupValue: mode,
-              onChanged: (v) {
-                if (v != null) ref.read(themeModeProvider.notifier).set(v);
-              },
-              child: const Column(children: [
-                RadioListTile<ThemeMode>(value: ThemeMode.dark, title: Text('Dark (default)')),
-                RadioListTile<ThemeMode>(value: ThemeMode.light, title: Text('Light')),
-                RadioListTile<ThemeMode>(value: ThemeMode.system, title: Text('Follow system')),
-              ]),
-            )),
+            SectionTitle(tr('Appearance'), icon: Icons.palette_outlined, color: AppColors.primary),
+            _appearanceCard(context),
             Gap.l,
-            const SectionTitle('Security'),
+            SectionTitle(tr('Language'), icon: Icons.translate, color: AppColors.accent),
+            _languageCard(context),
+            Gap.l,
+            SectionTitle(tr('Security'), icon: Icons.shield_outlined, color: AppColors.income),
             Card(child: Column(children: [
               ListTile(
                 leading: const Icon(Icons.lock_outline),
-                title: Text(hasPin ? 'Change Vault PIN' : 'Set Vault PIN'),
-                subtitle: const Text('Locks the Finance tab'),
+                title: Text(hasPin ? tr('Change Vault PIN') : tr('Set Vault PIN')),
+                subtitle: Text(tr('Locks the Finance tab')),
                 onTap: () => _setPin(context, ref),
               ),
               if (hasPin)
                 ListTile(
                   leading: const Icon(Icons.lock_open, color: AppColors.expense),
-                  title: const Text('Remove PIN', style: TextStyle(color: AppColors.expense)),
+                  title: Text(tr('Remove PIN'), style: const TextStyle(color: AppColors.expense)),
                   onTap: () {
                     repo.pinHash = null;
                     ref.read(vaultProvider.notifier).unlock();
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Vault PIN removed')));
+                        SnackBar(content: Text(tr('Vault PIN removed'))));
                   },
                 ),
             ])),
             Gap.l,
-            const SectionTitle('Backup'),
+            SectionTitle(tr('Backup'), icon: Icons.cloud_upload_outlined, color: AppColors.savings),
             Card(child: Column(children: [
               ListTile(
                 leading: const Icon(Icons.history, color: AppColors.savings),
-                title: const Text('Tuition history (JSON)'),
-                subtitle: const Text('All classes and payments per student: view, export, import'),
+                title: Text(tr('Tuition history (JSON)')),
+                subtitle: Text(tr('All classes and payments per student: view, export, import')),
                 onTap: () => context.push('/students/history'),
               ),
               ListTile(
                 leading: const Icon(Icons.save_alt, color: AppColors.income),
-                title: const Text('Save backup to device'),
-                subtitle: const Text('All data as one JSON file, saved where you choose'),
+                title: Text(tr('Save backup to device')),
+                subtitle: Text(tr('All data as one JSON file, saved where you choose')),
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   try {
                     final path = await saveBackupToDevice(ref.read(repoProvider));
                     messenger.showSnackBar(SnackBar(
-                        content: Text(path == null ? 'Save cancelled' : 'Backup saved')));
+                        content: Text(path == null ? tr('Save cancelled') : tr('Backup saved'))));
                   } catch (e) {
-                    messenger.showSnackBar(SnackBar(content: Text("Couldn't save backup: $e")));
+                    messenger.showSnackBar(SnackBar(content: Text(tr("Couldn't save backup: {e}", {'e': e}))));
                   }
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.share, color: AppColors.income),
-                title: const Text('Share backup'),
-                subtitle: const Text('Send the JSON file via WhatsApp, Google Drive, email…'),
+                title: Text(tr('Share backup')),
+                subtitle: Text(tr('Send the JSON file via WhatsApp, Google Drive, email…')),
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   try {
                     await exportBackup(ref.read(repoProvider));
                   } catch (e) {
-                    messenger.showSnackBar(SnackBar(content: Text("Couldn't share backup: $e")));
+                    messenger.showSnackBar(SnackBar(content: Text(tr("Couldn't share backup: {e}", {'e': e}))));
                   }
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.download, color: AppColors.savings),
-                title: const Text('Import backup'),
-                subtitle: const Text('Restore all data from a backup file (replaces current data)'),
+                title: Text(tr('Import backup')),
+                subtitle: Text(tr('Restore all data from a backup file (replaces current data)')),
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   final go = await showDialog<bool>(
                     context: context,
                     builder: (c) => AlertDialog(
-                      title: const Text('Restore a backup?'),
-                      content: const Text('This replaces everything in the app with the backup. '
-                          'A safety copy of your current data is kept automatically.'),
+                      title: Text(tr('Restore a backup?')),
+                      content: Text(tr('This replaces everything in the app with the backup. '
+                          'A safety copy of your current data is kept automatically.')),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Choose file')),
+                        TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Cancel'))),
+                        FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('Choose file'))),
                       ],
                     ),
                   );
                   if (go != true) return;
                   try {
                     final ok = await importBackup(ref.read(repoProvider));
+                    if (ok) reloadPreferences(ref);
                     messenger.showSnackBar(SnackBar(
-                        content: Text(ok ? 'Data imported. Restart the app to apply everything.' : 'Import cancelled')));
+                        content: Text(ok ? tr('Data imported. Restart the app to apply everything.') : tr('Import cancelled'))));
                   } on FormatException catch (e) {
                     messenger.showSnackBar(SnackBar(content: Text(e.message)));
                   } catch (e) {
-                    messenger.showSnackBar(SnackBar(content: Text("Couldn't import: $e")));
+                    messenger.showSnackBar(SnackBar(content: Text(tr("Couldn't import: {e}", {'e': e}))));
                   }
                 },
               ),
             ])),
             Gap.l,
-            const SectionTitle('General'),
+            SectionTitle(tr('General'), icon: Icons.tune, color: AppColors.warning),
             Card(child: Column(children: [
               ValueListenableBuilder<VersionStatus>(
                 valueListenable: versionStatus,
                 builder: (context, v, _) => ListTile(
                   leading: Icon(Icons.system_update,
                       color: v.updateAvailable ? AppColors.income : AppColors.primary),
-                  title: Text(v.updateAvailable ? 'Update available' : 'Check for updates'),
-                  subtitle: Text(v.label.isEmpty ? 'Download the latest version from GitHub' : v.label),
+                  title: Text(v.updateAvailable ? tr('Update available') : tr('Check for updates')),
+                  subtitle: Text(v.label.isEmpty ? tr('Download the latest version from GitHub') : v.label),
                   onTap: () => installLatestVersion(context),
                 ),
               ),
-              const ListTile(leading: Icon(Icons.language), title: Text('Language'), subtitle: Text('English (বাংলা coming soon)')),
               ValueListenableBuilder<VersionStatus>(
                 valueListenable: versionStatus,
                 builder: (context, v, _) => ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('Life Tracker Pro'),
-                  subtitle: Text(v.installed.isEmpty ? 'Version —' : 'Version ${v.installed}'),
+                  subtitle: Text(v.installed.isEmpty ? tr('Version —') : tr('Version {v}', {'v': v.installed})),
                 ),
               ),
             ])),
@@ -153,22 +156,173 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  // ---------------------------------------------------------------- appearance
+
+  Widget _appearanceCard(BuildContext context) {
+    final mode = ref.watch(themeModeProvider);
+    final look = ref.watch(appearanceProvider);
+    final b = Theme.of(context).brightness;
+    final scale = _dragScale ?? look.textScale;
+    final hint = Theme.of(context).hintColor;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _BackgroundPreview(gradient: look.background(b), scale: scale),
+          Gap.l,
+          _label(context, tr('Theme')),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(value: ThemeMode.dark, label: Text(tr('Dark')), icon: const Icon(Icons.dark_mode_outlined, size: 18)),
+                ButtonSegment(value: ThemeMode.light, label: Text(tr('Light')), icon: const Icon(Icons.light_mode_outlined, size: 18)),
+                ButtonSegment(value: ThemeMode.system, label: Text(tr('System')), icon: const Icon(Icons.brightness_auto_outlined, size: 18)),
+              ],
+              selected: {mode},
+              onSelectionChanged: (v) => ref.read(themeModeProvider.notifier).set(v.first),
+            ),
+          ),
+          Gap.l,
+          _label(context, b == Brightness.dark ? tr('Dark mode backgrounds') : tr('Light mode backgrounds')),
+          _swatchGrid(context, look, b),
+          Gap.l,
+          Row(children: [
+            Expanded(child: _label(context, tr('Text size'))),
+            Text('${(scale * 100).round()}%', style: TextStyle(color: hint, fontWeight: FontWeight.w600)),
+          ]),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            for (final st in textScaleSteps)
+              ChoiceChip(
+                showCheckmark: false,
+                label: Text(tr(st.$1)),
+                selected: (scale - st.$2).abs() < 0.001,
+                onSelected: (_) => _setScale(st.$2),
+              ),
+          ]),
+          Row(children: [
+            Text('A', style: TextStyle(fontSize: 13, color: hint, fontWeight: FontWeight.w700)),
+            Expanded(
+              child: Slider(
+                value: scale,
+                min: minTextScale,
+                max: maxTextScale,
+                divisions: ((maxTextScale - minTextScale) / 0.05).round(),
+                label: '${(scale * 100).round()}%',
+                onChanged: (v) => setState(() => _dragScale = v),
+                onChangeEnd: _setScale,
+              ),
+            ),
+            Text('A', style: TextStyle(fontSize: 22, color: hint, fontWeight: FontWeight.w700)),
+          ]),
+          Text(tr("Applies to the whole app, on top of the phone's font size."),
+              style: TextStyle(color: hint, fontSize: 12)),
+        ]),
+      ),
+    );
+  }
+
+  void _setScale(double v) {
+    final n = ref.read(appearanceProvider.notifier);
+    n.set(ref.read(appearanceProvider).copyWith(textScale: double.parse(v.toStringAsFixed(2))));
+    setState(() => _dragScale = null);
+  }
+
+  Widget _label(BuildContext context, String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+      );
+
+  Widget _swatchGrid(BuildContext context, Appearance look, Brightness b) {
+    final selected = look.bgIdFor(b);
+    final custom = look.customFor(b);
+    final notifier = ref.read(appearanceProvider.notifier);
+    return LayoutBuilder(builder: (context, c) {
+      const cols = 4, gap = 10.0;
+      final w = (c.maxWidth - gap * (cols - 1)) / cols;
+      return Wrap(spacing: gap, runSpacing: 12, children: [
+        for (final p in presetsFor(b))
+          _Swatch(
+            width: w,
+            gradient: p.gradient,
+            label: tr(p.name),
+            selected: selected == p.id,
+            onTap: () => notifier.set(look.withBg(b, p.id)),
+          ),
+        _Swatch(
+          width: w,
+          gradient: custom?.gradient,
+          label: tr('Custom'),
+          selected: selected == customBgId,
+          badge: custom == null ? Icons.add : Icons.edit,
+          onTap: () {
+            if (custom != null && selected != customBgId) {
+              notifier.set(look.withBg(b, customBgId));
+            } else {
+              _editCustom(context, b);
+            }
+          },
+          onLongPress: () => _editCustom(context, b),
+        ),
+      ]);
+    });
+  }
+
+  Future<void> _editCustom(BuildContext context, Brightness b) async {
+    final look = ref.read(appearanceProvider);
+    final res = await showBackgroundEditor(context, b, look.customFor(b) ?? CustomBg.seed(b));
+    if (res == null) return;
+    ref.read(appearanceProvider.notifier).set(ref.read(appearanceProvider).withBg(b, customBgId, custom: res));
+  }
+
+  // ------------------------------------------------------------------ language
+
+  Widget _languageCard(BuildContext context) {
+    final lang = ref.watch(langProvider);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _label(context, tr('App language')),
+          Row(children: [
+            for (final l in AppLang.values) ...[
+              if (l != AppLang.values.first) Gap.m,
+              Expanded(child: _LangTile(
+                lang: l,
+                selected: lang == l,
+                onTap: () => ref.read(langProvider.notifier).set(l),
+              )),
+            ],
+          ]),
+          if (lang == AppLang.bn) ...[
+            Gap.s,
+            Text(tr('Some screens are still in English.'),
+                style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------------- PIN
+
   Future<void> _setPin(BuildContext context, WidgetRef ref) async {
     final controller = TextEditingController();
     final pin = await showDialog<String>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Vault PIN'),
+        title: Text(tr('Vault PIN')),
         content: TextField(
           controller: controller, autofocus: true, obscureText: true, obscuringCharacter: '*',
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           maxLength: 6,
-          decoration: const InputDecoration(hintText: 'Enter 4–6 digit PIN'),
+          decoration: InputDecoration(hintText: tr('Enter 4–6 digit PIN')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, controller.text.trim()), child: const Text('Save')),
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(c, controller.text.trim()), child: Text(tr('Save'))),
         ],
       ),
     );
@@ -176,9 +330,189 @@ class SettingsScreen extends ConsumerWidget {
       ref.read(repoProvider).setPin(pin);
       ref.read(vaultProvider.notifier).unlock();
       if (context.mounted) {
+        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Vault PIN set')));
+            SnackBar(content: Text(tr('Vault PIN set'))));
       }
     }
+  }
+}
+
+/// Mini mock-up of a screen on the chosen background, with sample text.
+class _BackgroundPreview extends StatelessWidget {
+  const _BackgroundPreview({required this.gradient, required this.scale});
+  final Gradient gradient;
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final mq = MediaQuery.of(context);
+    // The app-wide scale already applies; while dragging, preview the new one.
+    final sys = mq.textScaler is AppTextScaler ? (mq.textScaler as AppTextScaler).system : mq.textScaler;
+    return MediaQuery(
+      data: mq.copyWith(textScaler: AppTextScaler(sys, scale)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.6)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(tr('Preview'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            const Spacer(),
+            Icon(Icons.more_horiz, color: cs.onSurface),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: cs.outline),
+            ),
+            child: Row(children: [
+              const IconBadge(icon: Icons.school, color: AppColors.primary, size: 34),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(tr('This is how text will look.'),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: cs.onSurface)),
+                Text(tr('Today: 5 classes · ৳ 27,000 collected'),
+                    style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+              ])),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// One tappable gradient swatch; [gradient] null draws an empty "create" tile.
+class _Swatch extends StatelessWidget {
+  const _Swatch({
+    required this.width,
+    required this.gradient,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.onLongPress,
+    this.badge,
+  });
+  final double width;
+  final Gradient? gradient;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final IconData? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: width,
+      child: Column(children: [
+        GestureDetector(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            height: width * 1.15,
+            decoration: BoxDecoration(
+              gradient: gradient,
+              color: gradient == null ? cs.surfaceContainer : null,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? AppColors.primary : cs.outline,
+                width: selected ? 3 : 1,
+              ),
+              boxShadow: selected
+                  ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.35), blurRadius: 10)]
+                  : null,
+            ),
+            child: Stack(children: [
+              if (gradient == null)
+                Center(child: Icon(Icons.add, color: cs.onSurfaceVariant, size: 28)),
+              if (selected)
+                Positioned(
+                  top: 6, right: 6,
+                  child: Container(
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    padding: const EdgeInsets.all(2),
+                    child: const Icon(Icons.check, color: Colors.white, size: 16),
+                  ),
+                ),
+              if (badge != null && gradient != null)
+                Positioned(
+                  bottom: 6, right: 6,
+                  child: Container(
+                    decoration: BoxDecoration(color: cs.surface.withValues(alpha: 0.85), shape: BoxShape.circle),
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(badge, color: cs.onSurface, size: 14),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? cs.onSurface : cs.onSurfaceVariant,
+            )),
+      ]),
+    );
+  }
+}
+
+class _LangTile extends StatelessWidget {
+  const _LangTile({required this.lang, required this.selected, required this.onTap});
+  final AppLang lang;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? AppColors.primary.withValues(alpha: 0.16) : cs.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: selected ? AppColors.primary : cs.outline, width: selected ? 2 : 1),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient: lang == AppLang.bn ? AppColors.incomeGrad : AppColors.savingsGrad,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Text(lang == AppLang.bn ? 'অ' : 'A',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 17)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(lang.nativeName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              Text(lang.otherName, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11.5)),
+            ])),
+            if (selected) const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+          ]),
+        ),
+      ),
+    );
   }
 }

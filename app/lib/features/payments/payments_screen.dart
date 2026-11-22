@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/data.dart';
+import '../../core/l10n.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -24,7 +25,7 @@ Color feeStatusColor(String status) => status == 'paid'
     : status == 'partial' ? AppColors.warning : AppColors.expense;
 
 String feeStatusLabel(String status) =>
-    status == 'paid' ? 'Paid' : status == 'partial' ? 'Partial' : 'Due';
+    status == 'paid' ? tr('Paid') : status == 'partial' ? tr('Partial') : tr('Due');
 
 String cycleLabel(Repo repo, Student s, DateTime month) =>
     '${fullDate(repo.cycleStart(s, month))} – ${fullDate(repo.cycleEnd(s, month))}';
@@ -68,24 +69,24 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
     final res = await showDialog<(bool, double?)>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Fee for ${monthLabel(widget.month)}'),
+        title: Text(tr('Fee for {m}', {'m': monthLabel(widget.month)})),
         content: TextField(
           controller: c, autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-          decoration: const InputDecoration(
-              prefixText: '৳ ', labelText: 'Custom due for this month only'),
+          decoration: InputDecoration(
+              prefixText: '৳ ', labelText: tr('Custom due for this month only')),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancel'))),
           if (current != null)
-            TextButton(onPressed: () => Navigator.pop(ctx, (true, null)), child: const Text('Use automatic')),
+            TextButton(onPressed: () => Navigator.pop(ctx, (true, null)), child: Text(tr('Use automatic'))),
           FilledButton(
             onPressed: () {
               final v = double.tryParse(c.text.trim());
               if (v != null) Navigator.pop(ctx, (true, v));
             },
-            child: const Text('Set')),
+            child: Text(tr('Set'))),
         ],
       ),
     );
@@ -95,16 +96,16 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
 
   Future<void> _pay(Repo repo, double amount, {int classes = 0}) async {
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter an amount')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Enter an amount'))));
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
     final id = await repo.addPayment(widget.student, widget.month, amount, _date, classes: classes);
     messenger.showSnackBar(SnackBar(
-      content: Text('${taka(amount)} marked paid'),
+      content: Text(tr('{a} marked paid', {'a': taka(amount)})),
       persist: false,
       duration: const Duration(seconds: 4),
-      action: SnackBarAction(label: 'UNDO', onPressed: () {
+      action: SnackBarAction(label: tr('UNDO'), onPressed: () {
         final p = repo.paymentFor(widget.student.id, monthKey(widget.month));
         if (p != null && p.installments.any((i) => i.id == id)) repo.removeInstallment(p, id);
       }),
@@ -144,7 +145,7 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                   Expanded(child: InkWell(
                   onTap: () => _editDue(repo, pay?.customDue, st.due),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(pay?.customDue != null ? 'Due (custom)' : 'Due',
+                    Text(pay?.customDue != null ? tr('Due (custom)') : tr('Due'),
                         style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
                     Row(mainAxisSize: MainAxisSize.min, children: [
                       Text(taka(st.total), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
@@ -153,26 +154,26 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     ]),
                   ]),
                 )),
-                  _stat('Paid', taka(st.paid), AppColors.income),
-                  _stat('Remaining', taka(st.remaining), st.remaining > 0 ? AppColors.warning : null),
+                  _stat(tr('Paid'), taka(st.paid), AppColors.income),
+                  _stat(tr('Remaining'), taka(st.remaining), st.remaining > 0 ? AppColors.warning : null),
                 ]),
                 if (st.carry.abs() > 0.5) ...[
                   Gap.s,
                   Text(
                     st.carry > 0
-                        ? 'Previous due ${taka(st.carry)} carried forward + this month ${taka(st.due)}'
-                        : 'Advance ${taka(-st.carry)} from earlier months − adjusted against ${taka(st.due)}',
+                        ? tr('Previous due {c} carried forward + this month {d}', {'c': taka(st.carry), 'd': taka(st.due)})
+                        : tr('Advance {c} from earlier months − adjusted against {d}', {'c': taka(-st.carry), 'd': taka(st.due)}),
                     style: TextStyle(
                         fontSize: 12.5,
                         color: st.carry > 0 ? AppColors.warning : AppColors.income,
                         fontWeight: FontWeight.w600)),
                 ],
                 Gap.m,
-                const Text('Payments', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(tr('Payments'), style: const TextStyle(fontWeight: FontWeight.w600)),
                 if (installments.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text('No payment yet.', style: TextStyle(color: Theme.of(context).hintColor)),
+                    child: Text(tr('No payment yet.'), style: TextStyle(color: Theme.of(context).hintColor)),
                   ),
                 for (final i in installments)
                   ListTile(
@@ -181,7 +182,7 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     leading: const Icon(Icons.check_circle, color: AppColors.income),
                     title: Text(taka(i.amount), style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text('${fullDate(i.date)}'
-                        '${i.classes > 0 ? ' · ${i.classes} ${i.classes == 1 ? 'class' : 'classes'}' : ''}'),
+                        '${i.classes > 0 ? ' · ${tr(i.classes == 1 ? '{n} class' : '{n} classes', {'n': i.classes})}' : ''}'),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => repo.removeInstallment(pay!, i.id)),
@@ -194,9 +195,9 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     onChanged: _onClasses,
                     decoration: InputDecoration(
-                      labelText: 'Pay for some classes',
-                      helperText: '${taka(_perClass)} per class · '
-                          '${repo.classesInMonth(s, widget.month)} taught this month'),
+                      labelText: tr('Pay for some classes'),
+                      helperText: tr('{r} per class · {n} taught this month',
+                          {'r': taka(_perClass), 'n': repo.classesInMonth(s, widget.month)})),
                   ),
                   Gap.s,
                 ],
@@ -206,7 +207,7 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
                     decoration: InputDecoration(
-                      labelText: 'Amount (৳)',
+                      labelText: tr('Amount (৳)'),
                       hintText: st.remaining > 0 ? st.remaining.toStringAsFixed(0) : null),
                   )),
                   Gap.m,
@@ -225,14 +226,14 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                   Expanded(child: OutlinedButton(
                     onPressed: () => _pay(repo, double.tryParse(_amount.text.trim()) ?? 0,
                         classes: _classesPaid),
-                    child: Text(_classesPaid > 0 ? 'Pay $_classesPaid classes' : 'Pay some'))),
+                    child: Text(_classesPaid > 0 ? tr('Pay {n} classes', {'n': _classesPaid}) : tr('Pay some')))),
                   Gap.m,
                   Expanded(child: FilledButton(
                     onPressed: st.remaining > 0
                         ? () => _pay(repo, st.remaining,
                             classes: (s.payPerClass || s.classesPerMonth > 0) ? repo.classesInMonth(s, widget.month) : 0)
                         : null,
-                    child: Text(st.remaining > 0 ? 'Pay all (${taka(st.remaining)})' : 'Fully paid'))),
+                    child: Text(st.remaining > 0 ? tr('Pay all ({a})', {'a': taka(st.remaining)}) : tr('Fully paid')))),
                 ]),
               ]),
             ),
@@ -272,7 +273,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
   Widget build(BuildContext context) {
     final repo = ref.read(repoProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Payments')),
+      appBar: AppBar(title: Text(tr('Payments'))),
       body: SafeArea(
         child: AnimatedBuilder(
           animation: Listenable.merge([repo.studentsL, repo.paymentsL, repo.logsL]),
@@ -298,15 +299,15 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                 ]),
                 Gap.m,
                 Row(children: [
-                  Expanded(child: GradientStatCard(label: 'Collected', value: taka(collected), gradient: AppColors.incomeGrad, icon: Icons.check_circle)),
+                  Expanded(child: GradientStatCard(label: tr('Collected'), value: taka(collected), gradient: AppColors.incomeGrad, icon: Icons.check_circle)),
                   Gap.m,
-                  Expanded(child: GradientStatCard(label: 'Due', value: taka(pending), gradient: AppColors.warningGrad, icon: Icons.schedule)),
+                  Expanded(child: GradientStatCard(label: tr('Due'), value: taka(pending), gradient: AppColors.warningGrad, icon: Icons.schedule)),
                 ]),
                 Gap.l,
                 if (visible.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: EmptyState(icon: Icons.attach_money, message: 'No students for this month.'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 40),
+                    child: EmptyState(icon: Icons.attach_money, message: tr('No students for this month.')),
                   )
                 else
                   ...visible.map((s) {
@@ -325,25 +326,25 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                             Text(repo.paymentFor(s.id, monthKey(_month))?.customDue != null
-                                ? '$classes ${classes == 1 ? 'class' : 'classes'} · custom fee ${taka(st.due)}'
-                                : '$classes ${classes == 1 ? 'class' : 'classes'} × ${taka(perClass)} = ${taka(st.due)}',
+                                ? tr('{n} · custom fee {d}', {'n': tr(classes == 1 ? '{n} class' : '{n} classes', {'n': classes}), 'd': taka(st.due)})
+                                : '${tr(classes == 1 ? '{n} class' : '{n} classes', {'n': classes})} × ${taka(perClass)} = ${taka(st.due)}',
                                 style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12.5)),
                             if (s.billingDay != 1)
                               Text(cycleLabel(repo, s, _month),
                                   style: TextStyle(color: Theme.of(context).hintColor, fontSize: 11.5)),
                             if (st.carry > 0.5)
-                              Text('Includes previous due ${taka(st.carry)}',
+                              Text(tr('Includes previous due {c}', {'c': taka(st.carry)}),
                                   style: const TextStyle(color: AppColors.warning, fontSize: 12)),
                             if (st.paid > 0)
-                              Text('Paid ${taka(st.paid)}',
+                              Text(tr('Paid {a}', {'a': taka(st.paid)}),
                                   style: const TextStyle(color: AppColors.income, fontSize: 12.5, fontWeight: FontWeight.w700)),
                             if (st.remaining > 0.5)
-                              Text('Due ${taka(st.remaining)}',
+                              Text(tr('Due {a}', {'a': taka(st.remaining)}),
                                   style: const TextStyle(color: AppColors.expense, fontSize: 12.5, fontWeight: FontWeight.w700)),
                           ])),
                           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                             Text(taka(st.due), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                            Text('$classes ${classes == 1 ? 'class' : 'classes'}',
+                            Text(tr(classes == 1 ? '{n} class' : '{n} classes', {'n': classes}),
                                 style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12)),
                             const SizedBox(height: 2),
                             Chip(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/appearance.dart';
+import 'core/l10n.dart';
 import 'core/providers.dart';
 import 'core/theme.dart';
 import 'models.dart';
@@ -110,6 +112,8 @@ class LifeTrackerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);
+    final look = ref.watch(appearanceProvider);
+    ref.watch(langProvider); // rebuild the app when the language changes
     return MaterialApp.router(
       title: 'Life Tracker Pro',
       debugShowCheckedModeBanner: false,
@@ -118,10 +122,13 @@ class LifeTrackerApp extends ConsumerWidget {
       themeMode: mode,
       routerConfig: _router,
       builder: (context, child) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        return DecoratedBox(
-          decoration: BoxDecoration(gradient: dark ? AppColors.darkBg : AppColors.lightBg),
-          child: child ?? const SizedBox.shrink(),
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: AppTextScaler(mq.textScaler, look.textScale)),
+          child: DecoratedBox(
+            decoration: BoxDecoration(gradient: look.background(Theme.of(context).brightness)),
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );
@@ -139,12 +146,12 @@ class HomeShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: true),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Tuition'),
-          NavigationDestination(icon: Icon(Icons.calendar_today_outlined), selectedIcon: Icon(Icons.calendar_today), label: 'Schedule'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Finance'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'More'),
+        destinations: [
+          NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard), label: tr('Home')),
+          NavigationDestination(icon: const Icon(Icons.school_outlined), selectedIcon: const Icon(Icons.school), label: tr('Tuition')),
+          NavigationDestination(icon: const Icon(Icons.calendar_today_outlined), selectedIcon: const Icon(Icons.calendar_today), label: tr('Schedule')),
+          NavigationDestination(icon: const Icon(Icons.account_balance_wallet_outlined), selectedIcon: const Icon(Icons.account_balance_wallet), label: tr('Finance')),
+          NavigationDestination(icon: const Icon(Icons.grid_view_outlined), selectedIcon: const Icon(Icons.grid_view), label: tr('More')),
         ],
       ),
     );

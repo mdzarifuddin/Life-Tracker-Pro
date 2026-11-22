@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/data.dart';
+import '../../core/l10n.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -85,20 +86,20 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     final repo = ref.read(repoProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tuition'),
+        title: Text(tr('Tuition')),
         actions: [
           TextButton.icon(
               onPressed: () => context.push('/students/payments'),
               icon: const Icon(Icons.payments_outlined, size: 18),
-              label: const Text('Pay')),
+              label: Text(tr('Pay'))),
           TextButton.icon(
               onPressed: () => context.push('/students/history'),
               icon: const Icon(Icons.history, size: 18),
-              label: const Text('History')),
+              label: Text(tr('History'))),
           TextButton.icon(
               onPressed: () => context.push('/students/exams'),
               icon: const Icon(Icons.event_note, size: 18),
-              label: const Text('Exams')),
+              label: Text(tr('Exams'))),
           const SizedBox(width: 4),
         ],
       ),
@@ -108,8 +109,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: TextField(
-                decoration: const InputDecoration(
-                  hintText: 'Search students…', prefixIcon: Icon(Icons.search)),
+                decoration: InputDecoration(
+                  hintText: tr('Search students…'), prefixIcon: const Icon(Icons.search)),
                 onChanged: (v) => setState(() => _q = v.toLowerCase()),
               ),
             ),
@@ -125,9 +126,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     child: SegmentedButton<bool>(
                       showSelectedIcon: false,
                       segments: [
-                        ButtonSegment(value: false, label: Text('Current ($current)'),
+                        ButtonSegment(value: false, label: Text(tr('Current ({n})', {'n': current})),
                             icon: const Icon(Icons.person, size: 18)),
-                        ButtonSegment(value: true, label: Text('All students (${all.length})'),
+                        ButtonSegment(value: true, label: Text(tr('All students ({n})', {'n': all.length})),
                             icon: const Icon(Icons.groups, size: 18)),
                       ],
                       selected: {_showAll},
@@ -152,7 +153,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: ChoiceChip(
-                          label: const Text('All batches'),
+                          label: Text(tr('All batches')),
                           selected: _batch == null,
                           onSelected: (_) => setState(() => _batch = null)),
                       ),
@@ -180,7 +181,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                   child: Row(children: [
                     const Icon(Icons.groups_2_outlined, color: AppColors.primary),
                     Gap.m,
-                    Expanded(child: Text('Open batch · attendance, payments, members',
+                    Expanded(child: Text(tr('Open batch · attendance, payments, members'),
                         style: const TextStyle(fontWeight: FontWeight.w600))),
                     const Icon(Icons.chevron_right),
                   ]),
@@ -202,10 +203,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     return EmptyState(
                       icon: Icons.people_outline,
                       message: _q.isNotEmpty
-                          ? 'No match.'
+                          ? tr('No match.')
                           : none
-                              ? 'No students yet.\nTap Add to create a student or a batch.'
-                              : 'No current students.\nOpen "All students" to see previous ones.',
+                              ? tr('No students yet.\nTap Add to create a student or a batch.')
+                              : tr('No current students.\nOpen "All students" to see previous ones.'),
                     );
                   }
                   return ListView.separated(
@@ -247,21 +248,21 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                 child: InfoChip(Icons.groups_2_outlined, s.batch, color: AppColors.primary)),
                             if (!s.isCurrent)
                               InfoChip(Icons.history,
-                                  s.leftDate == null ? 'Previous' : 'Previous · left ${fullDate(s.leftDate!)}',
+                                  s.leftDate == null ? tr('Previous') : tr('Previous · left {d}', {'d': fullDate(s.leftDate!)}),
                                   color: AppColors.expense),
-                            InfoChip(Icons.menu_book, '$classes ${classes == 1 ? 'class' : 'classes'}', color: AppColors.primary),
+                            InfoChip(Icons.menu_book, tr(classes == 1 ? '{n} class' : '{n} classes', {'n': classes}), color: AppColors.primary),
                             if (!s.isCurrent)
                               const SizedBox.shrink()
                             else if (next != null)
                               InfoChip(Icons.schedule,
-                                  'Next: ${weekdayNames[next.dayOfWeek]}${next.isDated ? ' ${shortDate(next.dateOn!)}' : ''} ${minutesToTime(next.startMinutes)}',
+                                  tr('Next: {t}', {'t': '${weekdayNames[next.dayOfWeek]}${next.isDated ? ' ${shortDate(next.dateOn!)}' : ''} ${minutesToTime(next.startMinutes)}'}),
                                   color: AppColors.savings)
                             else
-                              const InfoChip(Icons.schedule, 'No class set', color: AppColors.warning),
+                              InfoChip(Icons.schedule, tr('No class set'), color: AppColors.warning),
                           ]),
                           if (last != null && last.topics.isNotEmpty) ...[
                             Gap.s,
-                            Text('Last: ${last.topics}',
+                            Text(tr('Last: {t}', {'t': last.topics}),
                                 maxLines: 1, overflow: TextOverflow.ellipsis,
                                 style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12.5)),
                           ],
@@ -284,14 +285,14 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
             ListTile(
               leading: const Icon(Icons.person_add_alt),
-              title: const Text('Add Student'),
-              subtitle: const Text('One student'),
+              title: Text(tr('Add Student')),
+              subtitle: Text(tr('One student')),
               onTap: () { Navigator.pop(ctx); context.push('/student-form'); },
             ),
             ListTile(
               leading: const Icon(Icons.groups_2_outlined),
-              title: const Text('Add Batch'),
-              subtitle: const Text('A group: shared fee, days & time, many students'),
+              title: Text(tr('Add Batch')),
+              subtitle: Text(tr('A group: shared fee, days & time, many students')),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchFormScreen()));
@@ -301,7 +302,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           ])),
         ),
         icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        label: Text(tr('Add')),
       ),
     );
   }
@@ -577,10 +578,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             const SizedBox(width: 4),
             Text(TimeOfDay.fromDateTime(d).format(context), style: TextStyle(color: hint, fontSize: 12.5)),
             const SizedBox(width: 10),
-            const Icon(Icons.star_rounded, size: 15, color: AppColors.primary),
+            const Icon(Icons.star_rounded, size: 15, color: Color(0xFFC3C6FF)),
             const SizedBox(width: 2),
             Text('${l.performance}/10', style: const TextStyle(
-                color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                color: Color(0xFFC3C6FF), fontWeight: FontWeight.w700, fontSize: 12.5)),
             const Spacer(),
             Icon(Icons.edit_outlined, size: 15, color: hint),
           ]),
