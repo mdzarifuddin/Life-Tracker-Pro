@@ -9,7 +9,7 @@ A premium, **offline-first personal life-management app** for private tutors, un
 [![Flutter](https://img.shields.io/badge/Flutter-3.41-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Storage](https://img.shields.io/badge/storage-Hive%20(offline)-F5A623)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)]()
 
 </div>
 
@@ -120,8 +120,8 @@ flutter analyze
 ### Releasing
 ```bash
 # bump `version:` in app/pubspec.yaml, commit, then
-git tag v1.3.0
-git push origin v1.3.0      # CI builds the signed APK and creates the Release
+git tag v1.4.0
+git push origin v1.4.0      # CI builds the signed APK and creates the Release
 ```
 The installed app's updater then offers the new version. Signing secrets must be set in the repository settings (the workflow checks for them).
 
