@@ -164,6 +164,9 @@ class ClassLog {
   final String id, studentId, topics, homework, remarks, nextPlan, learned, notDone, subject;
   final DateTime date;
   final int performance;
+  /// Id of the payment that was recorded for this class ("" = not marked paid) and the
+  /// billing cycle (yyyy-MM) that payment lives in.
+  final String payId, payMonth;
 
   ClassLog({
     required this.id,
@@ -177,14 +180,25 @@ class ClassLog {
     this.learned = '',
     this.notDone = '',
     this.performance = 0,
+    this.payId = '',
+    this.payMonth = '',
   });
 
   Map<String, dynamic> toMap() => {
         'id': id, 'studentId': studentId, 'date': date.toIso8601String(),
         'subject': subject, 'topics': topics, 'homework': homework, 'remarks': remarks,
         'nextPlan': nextPlan, 'learned': learned, 'notDone': notDone,
-        'performance': performance,
+        'performance': performance, 'payId': payId, 'payMonth': payMonth,
       };
+
+  bool get isPaid => payId.isNotEmpty;
+
+  /// A copy with the payment link changed.
+  ClassLog withPay(String payId, String payMonth) => ClassLog(
+        id: id, studentId: studentId, date: date, subject: subject, topics: topics,
+        homework: homework, remarks: remarks, nextPlan: nextPlan, learned: learned,
+        notDone: notDone, performance: performance, payId: payId, payMonth: payMonth,
+      );
 
   factory ClassLog.fromMap(Map m) => ClassLog(
         id: _s(m['id']), studentId: _s(m['studentId']),
@@ -194,6 +208,7 @@ class ClassLog {
         remarks: _s(m['remarks']), nextPlan: _s(m['nextPlan']),
         learned: _s(m['learned']), notDone: _s(m['notDone']),
         performance: _i(m['performance']),
+        payId: _s(m['payId']), payMonth: _s(m['payMonth']),
       );
 }
 

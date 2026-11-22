@@ -18,6 +18,7 @@ import '../exams/exams_screen.dart';
 import '../schedule/routines_screen.dart' show addRoutineFromGallery, RoutineViewer;
 import 'batch_detail_screen.dart';
 import 'busy_time.dart';
+import 'mark_paid_sheet.dart';
 import 'batch_screen.dart';
 import '../schedule/schedule_screen.dart';
 
@@ -586,6 +587,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   SectionTitle('Attendance Calendar', icon: Icons.event_available, color: AppColors.income),
                   _TaughtCalendar(
                     taughtKeys: taughtKeys,
+                    paidKeys: {for (final l in logs) if (l.isPaid) dateKey(l.date)},
                     absentKeys: repo.absencesFor(id).map((a) => a.date).toSet(),
                     start: cStart,
                     end: cEnd,
@@ -621,7 +623,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                         .map((e) => _examCard(repo, e, taken: true)),
                   ],
                   Gap.l,
-                  SectionTitle('Class Logs (${monthLogs.length})'),
+                  SectionTitle('Class Logs (${monthLogs.length})',
+                      trailing: TextButton.icon(
+                          onPressed: () => showMarkPaidSheet(context, repo, s),
+                          icon: const Icon(Icons.price_check, size: 18),
+                          label: const Text('Mark paid'))),
                   if (monthLogs.isEmpty) const PadCard(child: Text('No logs this month.'))
                   else ...monthLogs.map((l) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -633,6 +639,11 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                                   '${fullDate(l.date)}${l.subject.isNotEmpty ? ' · ${l.subject}' : ''} · ${TimeOfDay.fromDateTime(l.date).format(context)}',
                                   maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontWeight: FontWeight.w600))),
+                              if (l.isPaid)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 8),
+                                  child: InfoChip(Icons.check_circle, 'Paid', color: paidClassColor),
+                                ),
                               Text('${l.performance}/10', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                               const SizedBox(width: 6),
                               Icon(Icons.edit, size: 15, color: Theme.of(context).hintColor),
@@ -661,9 +672,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
 /// Month calendar that highlights days a class was logged (green).
 class _TaughtCalendar extends StatelessWidget {
   const _TaughtCalendar({
-    required this.taughtKeys, required this.start, required this.end,
+    required this.taughtKeys, required this.start, required this.end, this.paidKeys = const {},
     required this.label, this.onShift, this.onTapDay, this.absentKeys = const {}});
   final Set<String> taughtKeys;
+  final Set<String> paidKeys; // classes whose payment is done
   final Set<String> absentKeys; // days missed (batch attendance)
   final DateTime start, end; // the student's billing month (e.g. 17 Mar – 16 Apr)
   final String label;
@@ -696,7 +708,7 @@ class _TaughtCalendar extends StatelessWidget {
         child: Container(
           margin: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: taught ? AppColors.income : (absent ? AppColors.expense : Colors.transparent),
+            color: taught ? (paidKeys.contains(key) ? paidClassColor : AppColors.income) : (absent ? AppColors.expense : Colors.transparent),
             shape: BoxShape.circle,
             border: isToday ? Border.all(color: AppColors.primary, width: 1.5) : null,
           ),
@@ -736,6 +748,13 @@ class _TaughtCalendar extends StatelessWidget {
           const SizedBox(width: 6),
           Text('Taught $count ${count == 1 ? 'day' : 'days'} · $label',
               style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (paidKeys.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Container(width: 12, height: 12,
+                decoration: const BoxDecoration(color: paidClassColor, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+            const Text('Paid'),
+          ],
           if (days.any((d) => absentKeys.contains(dateKey(d)) && !taughtKeys.contains(dateKey(d)))) ...[
             const SizedBox(width: 10),
             Container(width: 12, height: 12,

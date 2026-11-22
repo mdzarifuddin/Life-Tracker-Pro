@@ -27,6 +27,7 @@ class _BulkSheetState extends State<_BulkSheet> {
   final _text = TextEditingController();
   bool _busy = false;
   bool _create = true;
+  bool _markPaid = false;
 
   @override
   void dispose() {
@@ -66,10 +67,12 @@ class _BulkSheetState extends State<_BulkSheet> {
       if (st == null) continue;
       final t = st.defaultTimeMinutes;
       for (final d in e.days) {
-        await widget.repo.saveLog(ClassLog(
+        final log = ClassLog(
           id: newId(), studentId: st.id,
           date: DateTime(e.year, e.month, d, (t ~/ 60) % 24, t % 60),
-        ));
+        );
+        await widget.repo.saveLog(log);
+        if (_markPaid) await widget.repo.setLogPaid(st, log, true);
         n++;
       }
     }
@@ -123,6 +126,7 @@ class _BulkSheetState extends State<_BulkSheet> {
               value: _create,
               onChanged: (v) => setState(() => _create = v),
             ),
+SwitchListTile(              contentPadding: EdgeInsets.zero,              title: const Text('Mark these classes as paid'),              subtitle: const Text('Records the per-class fee on each date (student records only)'),              value: _markPaid,              onChanged: (v) => setState(() => _markPaid = v),            ),
             if (entries.isNotEmpty)
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 260),

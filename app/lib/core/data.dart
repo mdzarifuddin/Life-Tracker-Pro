@@ -684,6 +684,30 @@ class Repo {
     ).toMap()).whenComplete(() => _paysCache = null);
   }
 
+  /// Marks one class as paid (records a payment of the per-class fee dated that class
+  /// day, in the student's records only) or takes it back.
+  Future<void> setLogPaid(Student s, ClassLog l, bool paid) async {
+    if (paid == l.isPaid) return;
+    if (paid) {
+      final month = cycleMonthOf(s, l.date);
+      final id = await addPayment(s, month, s.perClassFee, l.date, classes: 1);
+      await saveLog(l.withPay(id, monthKey(month)));
+    } else {
+      final p = paymentFor(s.id, l.payMonth);
+      if (p != null && p.installments.any((i) => i.id == l.payId)) {
+        await removeInstallment(p, l.payId);
+      }
+      await saveLog(l.withPay('', ''));
+    }
+  }
+
+  /// Marks many classes paid (or unpaid) one after another.
+  Future<void> setLogsPaid(Student s, Iterable<ClassLog> logs, bool paid) async {
+    for (final l in logs) {
+      await setLogPaid(s, l, paid);
+    }
+  }
+
   /// Set (or clear with null) the fee for one month by hand.
   Future<void> setCustomDue(Student s, DateTime month, double? due) {
     final mk = monthKey(month);

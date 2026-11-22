@@ -13,6 +13,7 @@ class MoreScreen extends StatelessWidget {
       _MoreItem(Icons.account_balance, 'Govt Job Prep', 'Daily MCQ targets', AppColors.savingsGrad, '/more/jobprep'),
       _MoreItem(Icons.school, 'MSc Thesis', 'Stage-wise progress', AppColors.primaryGrad, '/more/thesis'),
       _MoreItem(Icons.shopping_cart, 'Family Lists', 'Bazar & future needs', AppColors.accentGrad, '/more/lists'),
+      _MoreItem(Icons.history, 'Tuition History', 'All classes, payments, JSON export', AppColors.incomeGrad, '/more/history'),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('More')),

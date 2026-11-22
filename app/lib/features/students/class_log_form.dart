@@ -22,6 +22,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
   final _notDone = TextEditingController();
   final _remarks = TextEditingController();
   double _perf = 7;
+  bool _paid = false; // payment received for this class
 
   @override
   void initState() {
@@ -39,6 +40,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
       _notDone.text = e.notDone;
       _remarks.text = e.remarks;
       _perf = e.performance.toDouble();
+      _paid = e.isPaid;
     } else {
       _studentId = widget.studentId;
       if (widget.presetDate != null) _date = widget.presetDate!;
@@ -53,7 +55,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
       return;
     }
     final dt = DateTime(_date.year, _date.month, _date.day, _time.hour, _time.minute);
-    await repo.saveLog(ClassLog(
+    final saved = ClassLog(
       id: widget.existing?.id ?? newId(),
       studentId: _studentId!, date: dt,
       subject: _logSubjects.join(', '),
@@ -62,7 +64,11 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
       nextPlan: _nextPlan.text.trim(), learned: _learned.text.trim(),
       notDone: _notDone.text.trim(), remarks: _remarks.text.trim(),
       performance: _perf.round(),
-    ));
+      payId: widget.existing?.payId ?? '', payMonth: widget.existing?.payMonth ?? '',
+    );
+    await repo.saveLog(saved);
+    final st = repo.student(_studentId!);
+    if (st != null && _paid != saved.isPaid) await repo.setLogPaid(st, saved, _paid);
     if (mounted) context.pop();
   }
 
@@ -143,6 +149,15 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
                 label: '${_perf.round()}', onChanged: (v) => setState(() => _perf = v))),
           ]),
           _field(_remarks, "Today's comment"),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Payment received for this class'),
+            subtitle: Text(_studentId == null
+                ? 'Select a student first'
+                : 'Records ${taka(repo.student(_studentId!)?.perClassFee ?? 0)} on this date (student records only)'),
+            value: _paid,
+            onChanged: _studentId == null ? null : (v) => setState(() => _paid = v),
+          ),
         ]),
       ),
       bottomNavigationBar: SafeArea(

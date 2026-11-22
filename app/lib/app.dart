@@ -17,6 +17,7 @@ import 'features/jobprep/jobprep_screen.dart';
 import 'features/thesis/thesis_screen.dart';
 import 'features/lists/lists_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/history/history_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -61,6 +62,7 @@ final _router = GoRouter(
               GoRoute(path: 'jobprep', builder: (c, s) => const JobPrepScreen()),
               GoRoute(path: 'thesis', builder: (c, s) => const ThesisScreen()),
               GoRoute(path: 'lists', builder: (c, s) => const ListsScreen()),
+              GoRoute(path: 'history', builder: (c, s) => const HistoryScreen()),
               GoRoute(path: 'settings', builder: (c, s) => const SettingsScreen()),
             ],
           ),
