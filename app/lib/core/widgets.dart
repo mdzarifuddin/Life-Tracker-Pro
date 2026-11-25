@@ -9,28 +9,71 @@ class SectionTitle extends StatelessWidget {
   final IconData? icon;
   final Color? color;
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              IconBadge(icon: icon!, color: color ?? AppColors.primary, size: 30),
-              const SizedBox(width: 10),
-            ],
-            Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const Spacer(),
-            ?trailing,
+  Widget build(BuildContext context) {
+    // Section titles sit on the app background, not on a card.
+    final ink = BgInk.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 10, 2, 8),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            IconBadge(icon: icon!, color: color ?? AppColors.primary, size: 30, onBackground: true),
+            const SizedBox(width: 10),
           ],
+          Text(text, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: ink.text)),
+          const Spacer(),
+          if (trailing != null)
+            TextButtonTheme(
+              data: TextButtonThemeData(
+                  style: (Theme.of(context).textButtonTheme.style ?? const ButtonStyle())
+                      .copyWith(foregroundColor: WidgetStatePropertyAll(ink.link))),
+              child: IconTheme.merge(data: IconThemeData(color: ink.link), child: trailing!),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// For content laid straight on the app background (forms without cards, app-bar
+/// actions): plain text, icons, list tiles and text buttons below take the colours
+/// that suit the actual background. Cards / fields / sheets reset their own colours.
+class OnBackground extends StatelessWidget {
+  const OnBackground({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) {
+    final ink = BgInk.of(context);
+    final tb = Theme.of(context).textButtonTheme.style ?? const ButtonStyle();
+    return DefaultTextStyle.merge(
+      style: TextStyle(color: ink.text),
+      child: IconTheme.merge(
+        data: IconThemeData(color: ink.text),
+        child: ListTileTheme.merge(
+          textColor: ink.text,
+          iconColor: ink.text,
+          subtitleTextStyle: TextStyle(color: ink.muted, fontSize: 13),
+          child: TextButtonTheme(
+            data: TextButtonThemeData(
+                style: tb.copyWith(foregroundColor: WidgetStatePropertyAll(ink.link))),
+            child: child,
+          ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// Rounded square icon with a tinted background.
 class IconBadge extends StatelessWidget {
-  const IconBadge({super.key, required this.icon, required this.color, this.size = 44});
+  const IconBadge(
+      {super.key, required this.icon, required this.color, this.size = 44, this.onBackground = false});
   final IconData icon;
   final Color color;
   final double size;
+
+  /// True when drawn straight on the app background (not on a card).
+  final bool onBackground;
   @override
   Widget build(BuildContext context) => Container(
         width: size, height: size,
@@ -38,7 +81,9 @@ class IconBadge extends StatelessWidget {
           color: color.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(size * 0.32),
         ),
-        child: Icon(icon, color: readableOn(context, color), size: size * 0.55),
+        child: Icon(icon,
+            color: onBackground ? readableOnBg(context, color) : readableOn(context, color),
+            size: size * 0.55),
       );
 }
 
@@ -199,10 +244,11 @@ class EmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 56, color: Theme.of(context).hintColor),
+              // Empty states sit on the app background.
+              Icon(icon, size: 56, color: BgInk.of(context).muted),
               Gap.l,
               Text(message, textAlign: TextAlign.center,
-                  style: TextStyle(color: Theme.of(context).hintColor, fontSize: 15)),
+                  style: TextStyle(color: BgInk.of(context).muted, fontSize: 15)),
               if (cta != null) ...[
                 Gap.l,
                 FilledButton.tonal(onPressed: onCta, child: Text(cta!)),
@@ -296,6 +342,31 @@ Color readableOn(BuildContext context, Color c) {
   final dark = Theme.of(context).brightness == Brightness.dark;
   final l = c.computeLuminance();
   if (dark && l < 0.30) return Color.lerp(c, Colors.white, 0.55)!;
-  if (!dark && l > 0.35) return Color.lerp(c, Colors.black, 0.35)!;
+  if (!dark && l > 0.30) return Color.lerp(c, Colors.black, 0.35)!;
+  return c;
+}
+
+/// Text / icon colour for content on a solid [fill]: white on deep fills, near-black on
+/// bright ones (green, amber, pink…) where white letters would wash out.
+Color onColor(Color fill) =>
+    fill.computeLuminance() > 0.3 ? const Color(0xFF14171C) : Colors.white;
+
+/// [c] darkened just enough for white text on it to stay readable (bright picks such
+/// as yellow, lime or orange otherwise wash white letters out).
+Color deepenForWhite(Color c, {double maxLuminance = 0.2}) {
+  var out = c;
+  for (var i = 0; i < 10 && out.computeLuminance() > maxLuminance; i++) {
+    out = Color.lerp(out, Colors.black, 0.12)!;
+  }
+  return out;
+}
+
+/// Like [readableOn], for colours drawn straight on the app background (see [BgInk]);
+/// a little stronger in light mode because the pastel background is not pure white.
+Color readableOnBg(BuildContext context, Color c) {
+  final dark = BgInk.of(context).dark;
+  final l = c.computeLuminance();
+  if (dark && l < 0.30) return Color.lerp(c, Colors.white, 0.55)!;
+  if (!dark && l > 0.25) return Color.lerp(c, Colors.black, 0.45)!;
   return c;
 }

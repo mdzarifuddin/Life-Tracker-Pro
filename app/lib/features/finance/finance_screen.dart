@@ -122,12 +122,20 @@ class _Mf {
   final bool dark;
   static const green = Color(0xFF6CC28A);
   static const red = Color(0xFFEF7F7F);
+
+  /// Deeper green / red for filled surfaces that carry white text (the light
+  /// [green] / [red] are too pale for white letters).
+  static const greenFill = Color(0xFF22874D);
+  static const redFill = Color(0xFFD03E3E);
   Color get bg => dark ? const Color(0xFF3B3B3B) : const Color(0xFFF1FAF3);
-  Color get bar => dark ? const Color(0xFF5B5B5B) : const Color(0xFF7CC896);
+  Color get bar => dark ? const Color(0xFF5B5B5B) : greenFill;
   Color get text => dark ? Colors.white : const Color(0xFF4A6655);
-  Color get muted => dark ? Colors.white60 : const Color(0xFF6FAE85);
+  Color get muted => dark ? Colors.white60 : const Color(0xFF4E8763);
   Color get line => dark ? Colors.white24 : const Color(0xFFA9D9B9);
   Color get keyFill => dark ? const Color(0xFF454545) : const Color(0xFFF8FDF9);
+  /// [c] as text on this screen's background: bright colours (yellow, lime, the
+  /// pale green) are deepened in light mode so they stay readable on the mint.
+  Color ink(Color c) => !dark && c.computeLuminance() > 0.3 ? Color.lerp(c, Colors.black, 0.4)! : c;
   Color get selFill => dark ? const Color(0xFF4F6B58) : const Color(0xFFD7F0DF);
 }
 
@@ -289,7 +297,7 @@ class _VaultGateState extends ConsumerState<_VaultGate> {
               ),
               Gap.l,
               FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: _Mf.green),
+                  style: FilledButton.styleFrom(backgroundColor: _Mf.greenFill),
                   onPressed: _try, child: const Text('Unlock')),
               Gap.m,
               TextButton.icon(
@@ -421,7 +429,7 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: SizedBox(width: double.infinity, child: FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: _Mf.green),
+                style: FilledButton.styleFrom(backgroundColor: _Mf.greenFill),
                 onPressed: () {
                   repo.chartCats = sel.toList();
                   Navigator.pop(ctx);
@@ -468,7 +476,7 @@ class _FinanceHomeState extends ConsumerState<_FinanceHome> {
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Finance', style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic, fontWeight: FontWeight.w700)),
           Text(_account == null ? 'All accounts' : repo.accountName(_account!),
-              style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              style: const TextStyle(fontSize: 12, color: Color(0xE6FFFFFF))),
         ]),
         actions: [
           if (!_listMode)
@@ -779,7 +787,7 @@ class _CatSlot extends StatelessWidget {
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(catIcon(name), color: catColor(name), size: 32),
             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: catColor(name), fontSize: 11)),
+                style: TextStyle(color: _Mf(context).ink(catColor(name)), fontSize: 11)),
             SizedBox(
               height: 15,
               child: percent == null
@@ -807,7 +815,7 @@ class _BalanceBar extends StatelessWidget {
         const SizedBox(width: 20),
         Expanded(
           child: Material(
-            color: balance >= 0 ? _Mf.green : _Mf.red,
+            color: balance >= 0 ? _Mf.greenFill : _Mf.redFill,
             elevation: 2,
             borderRadius: BorderRadius.circular(4),
             child: InkWell(
@@ -907,7 +915,7 @@ class _GroupedListState extends ConsumerState<_GroupedList> {
           const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(color: _Mf.green, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: _Mf.greenFill, borderRadius: BorderRadius.circular(8)),
             child: Text('${list.length}', style: const TextStyle(color: Colors.white, fontSize: 12)),
           ),
           const Spacer(),
@@ -923,7 +931,7 @@ class _GroupedListState extends ConsumerState<_GroupedList> {
         background: Container(
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 20),
-          color: _Mf.red,
+          color: _Mf.redFill,
           child: const Icon(Icons.delete_outline, color: Colors.white),
         ),
         onDismissed: (_) => ref.read(repoProvider).deleteTxn(t.id),

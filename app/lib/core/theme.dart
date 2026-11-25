@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 /// Life Tracker Pro design tokens — see docs/DESIGN_SYSTEM.md
@@ -53,6 +54,7 @@ class AppColors {
   static Color forIndex(int i) => palette[i % palette.length];
 
   // ---- Gradients (colorful / modern) ----
+  // Deep enough at both ends to carry white text (the light ends used to wash it out).
   static const _tl = Alignment.topLeft;
   static const _br = Alignment.bottomRight;
   static const hero = LinearGradient(
@@ -66,27 +68,27 @@ class AppColors {
     end: _br,
   );
   static const incomeGrad = LinearGradient(
-    colors: [Color(0xFF059669), Color(0xFF34D399)],
+    colors: [Color(0xFF047857), Color(0xFF059669)],
     begin: _tl,
     end: _br,
   );
   static const expenseGrad = LinearGradient(
-    colors: [Color(0xFFE11D48), Color(0xFFFB7185)],
+    colors: [Color(0xFFBE123C), Color(0xFFE11D48)],
     begin: _tl,
     end: _br,
   );
   static const savingsGrad = LinearGradient(
-    colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+    colors: [Color(0xFF1D4ED8), Color(0xFF0284C7)],
     begin: _tl,
     end: _br,
   );
   static const warningGrad = LinearGradient(
-    colors: [Color(0xFFD97706), Color(0xFFFBBF24)],
+    colors: [Color(0xFFB45309), Color(0xFFD97706)],
     begin: _tl,
     end: _br,
   );
   static const accentGrad = LinearGradient(
-    colors: [Color(0xFF0891B2), Color(0xFF22D3EE)],
+    colors: [Color(0xFF0E7490), Color(0xFF0891B2)],
     begin: _tl,
     end: _br,
   );
@@ -102,6 +104,12 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFFFFD9EC), Color(0xFFE6D8FF), Color(0xFFFFF3C4), Color(0xFFFFDCEB), Color(0xFFEBDDFF)],
     stops: [0.0, 0.28, 0.52, 0.76, 1.0],
+  );
+
+  static const midnightBg = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF0B0F1A), Color(0xFF131A2B), Color(0xFF0A0E17)],
   );
 
   static const moduleGrads = <LinearGradient>[
@@ -123,12 +131,42 @@ class Gap {
   static const xl = SizedBox(height: 18, width: 18);
 }
 
+/// Colours for text and icons drawn straight on the app background (outside cards).
+/// The three backgrounds are fixed (Pastel light, Aurora / Midnight dark), so this
+/// simply follows the theme; widgets use it for anything that is not on a card.
+@immutable
+class BgInk extends ThemeExtension<BgInk> {
+  const BgInk({required this.dark});
+
+  /// Whether the app background is dark (so light text goes on it).
+  final bool dark;
+
+  Color get text => dark ? AppColors.dOnBackground : AppColors.lOnBackground;
+  Color get muted => dark ? const Color(0xFFB4BAC4) : AppColors.lMuted;
+  Color get link => dark ? AppColors.linkDark : AppColors.linkLight;
+
+  /// Status-bar / navigation-bar icon style for this background.
+  SystemUiOverlayStyle get overlay => (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+      .copyWith(statusBarColor: Colors.transparent);
+
+  static BgInk of(BuildContext context) =>
+      Theme.of(context).extension<BgInk>() ??
+      BgInk(dark: Theme.of(context).brightness == Brightness.dark);
+
+  @override
+  BgInk copyWith({bool? dark}) => BgInk(dark: dark ?? this.dark);
+
+  @override
+  BgInk lerp(BgInk? other, double t) => t < 0.5 || other == null ? this : other;
+}
+
 class AppTheme {
   static ThemeData dark() => _build(Brightness.dark);
   static ThemeData light() => _build(Brightness.light);
 
   static ThemeData _build(Brightness b) {
     final dark = b == Brightness.dark;
+    final ink = BgInk(dark: dark);
     final scheme = ColorScheme(
       brightness: b,
       primary: AppColors.primary,
@@ -163,19 +201,42 @@ class AppTheme {
       brightness: b,
       colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
+      // Dropdown menus (DropdownButtonFormField) paint on canvasColor: keep it the
+      // solid surface so their onSurface text is always readable.
+      canvasColor: dark ? AppColors.dSurface : AppColors.lSurface,
       fontFamily: 'Roboto',
     );
 
     final muted = dark ? AppColors.dMuted : AppColors.lMuted;
 
     return base.copyWith(
+      extensions: [ink],
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        foregroundColor: dark
-            ? AppColors.dOnBackground
-            : AppColors.lOnBackground,
+        // The bar is see-through, so its text sits on the app background.
+        foregroundColor: ink.text,
+        systemOverlayStyle: ink.overlay,
+      ),
+      // Tab bars live in the see-through app bar, i.e. on the app background.
+      tabBarTheme: TabBarThemeData(
+        labelColor: ink.link,
+        unselectedLabelColor: ink.muted,
+        indicatorColor: ink.link,
+        dividerColor: ink.muted.withValues(alpha: 0.3),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          // Unselected segments get a solid surface so their text never sits on the
+          // (possibly light or dark) app background.
+          backgroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected) ? AppColors.accent : scheme.surface),
+          foregroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected) ? Colors.black : scheme.onSurface),
+          iconColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected) ? Colors.black : scheme.onSurface),
+        ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: dark ? AppColors.dSurface : AppColors.lSurface,
@@ -203,6 +264,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: TextStyle(color: scheme.onSurface),
         menuStyle: MenuStyle(
           backgroundColor: WidgetStatePropertyAll(
             dark ? AppColors.dSurface : AppColors.lSurface,
@@ -339,6 +401,8 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 48),
           foregroundColor: dark ? AppColors.linkDark : AppColors.linkLight,
+          // Solid fill so the label never depends on what is behind the button.
+          backgroundColor: scheme.surface,
           side: BorderSide(color: scheme.outline),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -355,10 +419,14 @@ class AppTheme {
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
+      // copyWith on the base styles keeps their colours: plain TextStyles here used to
+      // drop them, so e.g. dropdown items / sheet titles (titleMedium) had no colour
+      // of their own and picked up whatever was around them.
       textTheme: base.textTheme.copyWith(
-        headlineMedium: const TextStyle(fontWeight: FontWeight.bold),
-        titleLarge: const TextStyle(fontWeight: FontWeight.w600),
-        titleMedium: const TextStyle(fontWeight: FontWeight.w600),
+        headlineMedium: base.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+        titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        titleMedium: base.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600, color: scheme.onSurface),
         bodyMedium: TextStyle(
           color: dark ? AppColors.dOnBackground : AppColors.lOnBackground,
         ),

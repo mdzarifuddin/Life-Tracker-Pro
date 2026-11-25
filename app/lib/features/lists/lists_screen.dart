@@ -42,8 +42,8 @@ class _ListsScreenState extends ConsumerState<ListsScreen> with SingleTickerProv
             width: double.infinity,
             color: AppColors.accent.withValues(alpha: 0.10),
             padding: const EdgeInsets.all(10),
-            child: const Text('🔗 Real-time family sharing (Google) arrives in v1.1.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
+            child: Text('🔗 Real-time family sharing (Google) arrives in v1.1.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: BgInk.of(context).text)),
           ),
           Expanded(
             child: AnimatedBuilder(
@@ -86,7 +86,7 @@ class _BazarTab extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
         child: Align(alignment: Alignment.centerLeft,
-            child: Text('Tap to add', style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12))),
+            child: Text('Tap to add', style: TextStyle(color: BgInk.of(context).muted, fontSize: 12))),
       ),
       // short chips that wrap onto 2-3 rows (no sideways scrolling)
       Padding(

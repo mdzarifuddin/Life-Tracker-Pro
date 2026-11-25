@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/data.dart';
 import '../../core/theme.dart';
+import '../../core/weekday_picker.dart';
 import '../../core/widgets.dart';
 import '../../models.dart';
 
@@ -205,17 +206,11 @@ class _BusySheetState extends State<_BusySheet> {
               ),
             ],
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              children: [
-                for (var i = 0; i < 7; i++)
-                  FilterChip(
-                    label: Text(weekdayNames[i]),
-                    selected: _days.contains(i),
-                    onSelected: (v) =>
-                        setState(() => v ? _days.add(i) : _days.remove(i)),
-                  ),
-              ],
+            WeekdayPicker(
+              selected: _days,
+              onChanged: (s) => setState(() => _days
+                ..clear()
+                ..addAll(s)),
             ),
             const SizedBox(height: 8),
             Row(

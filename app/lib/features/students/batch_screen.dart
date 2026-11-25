@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/data.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../core/weekday_picker.dart';
 import '../../models.dart';
 
 /// Create a batch: shared fee / days / time / subjects, then add several new
@@ -136,21 +137,12 @@ class _BatchFormScreenState extends ConsumerState<BatchFormScreen> {
           Gap.m,
           const Text('Class days', style: TextStyle(fontWeight: FontWeight.w600)),
           Gap.s,
-          Row(children: weekdayNames.map((d) => Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: FilterChip(
-                  label: SizedBox(width: double.infinity,
-                      child: Text(d, textAlign: TextAlign.center, maxLines: 1,
-                          style: const TextStyle(fontSize: 12))),
-                  labelPadding: EdgeInsets.zero,
-                  padding: EdgeInsets.zero,
-                  showCheckmark: false,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  selected: _days.contains(d),
-                  onSelected: (v) => setState(() => v ? _days.add(d) : _days.remove(d)),
-                ),
-              ))).toList()),
+          WeekdayPicker(
+            selected: {for (var i = 0; i < 7; i++) if (_days.contains(weekdayNames[i])) i},
+            onChanged: (s) => setState(() => _days
+              ..clear()
+              ..addAll(s.map((i) => weekdayNames[i]))),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.access_time),

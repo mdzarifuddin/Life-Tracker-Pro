@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'appearance.dart';
 import 'data.dart';
@@ -6,20 +5,7 @@ import 'l10n.dart';
 
 final repoProvider = Provider<Repo>((ref) => Repo());
 
-class ThemeModeNotifier extends Notifier<ThemeMode> {
-  @override
-  ThemeMode build() => ref.read(repoProvider).themeMode;
-
-  void set(ThemeMode m) {
-    ref.read(repoProvider).themeMode = m;
-    state = m;
-  }
-}
-
-final themeModeProvider =
-    NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
-
-/// Background presets / custom background / text size, saved in settings.
+/// Background (one of three; it also sets light/dark) + text size, saved in settings.
 class AppearanceNotifier extends Notifier<Appearance> {
   @override
   Appearance build() {
@@ -55,9 +41,8 @@ class LangNotifier extends Notifier<AppLang> {
 
 final langProvider = NotifierProvider<LangNotifier, AppLang>(LangNotifier.new);
 
-/// Re-reads theme, appearance and language from settings (after a restore).
+/// Re-reads appearance and language from settings (after a restore).
 void reloadPreferences(WidgetRef ref) {
-  ref.invalidate(themeModeProvider);
   ref.invalidate(appearanceProvider);
   ref.invalidate(langProvider);
   applyLang(ref.read(langProvider), force: true);

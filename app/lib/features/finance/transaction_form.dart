@@ -51,7 +51,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
 
   bool get _editing => widget.existing != null;
   bool get _isIncome => _type == 'income';
-  Color get _color => _isIncome ? _Mf.green : _Mf.red;
+  Color get _color => _isIncome ? _Mf.greenFill : _Mf.redFill;
 
   @override
   void initState() {
@@ -197,7 +197,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
                         Icon(catIcon(c.name), color: col, size: 36),
                         const SizedBox(height: 6),
                         Text(c.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: col, fontSize: 12.5)),
+                            style: TextStyle(color: mf.ink(col), fontSize: 12.5)),
                       ]),
                     ),
                   );
@@ -280,7 +280,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _Mf.red),
+              style: FilledButton.styleFrom(backgroundColor: _Mf.redFill),
               onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
         ],
       ),
@@ -571,7 +571,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
                 backgroundColor: mf.keyFill,
                 side: BorderSide(color: mf.line),
                 avatar: Icon(catIcon(_category!), color: catColor(_category!), size: 20),
-                label: Text(_category!, style: TextStyle(color: catColor(_category!))),
+                label: Text(_category!, style: TextStyle(color: mf.ink(catColor(_category!)))),
                 onPressed: () async {
                   final c = await _pickCategory();
                   if (c != null) setState(() => _category = c);
@@ -677,7 +677,7 @@ class _NewCategoryDialogState extends State<_NewCategoryDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: _Mf.green, minimumSize: const Size(88, 44)),
+          style: FilledButton.styleFrom(backgroundColor: _Mf.greenFill, minimumSize: const Size(88, 44)),
           onPressed: _submit,
           child: const Text('Add'),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/data.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../models.dart';
 
 /// Colour used for classes whose payment is done.
@@ -107,7 +108,7 @@ class _MarkPaidSheetState extends State<_MarkPaidSheet> {
                                 ),
                                 title: Text(fullDate(l.date),
                                     style: TextStyle(fontWeight: FontWeight.w600,
-                                        color: l.isPaid ? paidClassColor : null)),
+                                        color: l.isPaid ? readableOn(context, paidClassColor) : null)),
                                 subtitle: Text(l.isPaid ? 'Paid' : 'Not paid yet'),
                                 trailing: Text(taka(fee), style: TextStyle(color: hint)),
                                 onTap: _busy

@@ -81,13 +81,16 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(editing ? 'Edit Class Log' : 'Log Class'), toolbarHeight: 48, actions: [
         if (!editing)
-          TextButton.icon(
-            onPressed: () => showBulkClassesSheet(context, repo),
-            icon: const Icon(Icons.playlist_add, size: 20),
-            label: const Text('Add many'),
+          OnBackground(
+            child: TextButton.icon(
+              onPressed: () => showBulkClassesSheet(context, repo),
+              icon: const Icon(Icons.playlist_add, size: 20),
+              label: const Text('Add many'),
+            ),
           ),
       ]),
-      body: SafeArea(
+      // this form sits straight on the app background (no cards)
+      body: OnBackground(child: SafeArea(
         child: ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), children: [
           DropdownButtonFormField<String>(
             initialValue: _studentId,
@@ -159,7 +162,7 @@ class _ClassLogFormScreenState extends ConsumerState<ClassLogFormScreen> {
             onChanged: _studentId == null ? null : (v) => setState(() => _paid = v),
           ),
         ]),
-      ),
+      )),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),

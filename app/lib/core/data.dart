@@ -835,13 +835,4 @@ class Repo {
     }
     return false;
   }
-  ThemeMode get themeMode {
-    switch (settings.get('themeMode') as String?) {
-      case 'light': return ThemeMode.light;
-      case 'system': return ThemeMode.system;
-      default: return ThemeMode.dark;
-    }
-  }
-
-  set themeMode(ThemeMode m) => settings.put('themeMode', m.name);
 }

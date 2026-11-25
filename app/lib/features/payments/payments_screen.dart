@@ -135,7 +135,7 @@ class _FeeSheetState extends ConsumerState<_FeeSheet> {
                 Row(children: [
                   Expanded(child: Text(s.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
                   Chip(
-                    label: Text(feeStatusLabel(st.status), style: const TextStyle(color: Colors.white)),
+                    label: Text(feeStatusLabel(st.status), style: TextStyle(color: onColor(color))),
                     backgroundColor: color, visualDensity: VisualDensity.compact),
                 ]),
                 Text(cycleLabel(repo, s, widget.month),
@@ -293,9 +293,12 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  IconButton(onPressed: () => _shift(-1), icon: const Icon(Icons.chevron_left)),
-                  Text(monthLabel(_month), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  IconButton(onPressed: () => _shift(1), icon: const Icon(Icons.chevron_right)),
+                  IconButton(onPressed: () => _shift(-1), color: BgInk.of(context).text,
+                      icon: const Icon(Icons.chevron_left)),
+                  Text(monthLabel(_month),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: BgInk.of(context).text)),
+                  IconButton(onPressed: () => _shift(1), color: BgInk.of(context).text,
+                      icon: const Icon(Icons.chevron_right)),
                 ]),
                 Gap.m,
                 Row(children: [
@@ -337,7 +340,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                                   style: const TextStyle(color: AppColors.warning, fontSize: 12)),
                             if (st.paid > 0)
                               Text(tr('Paid {a}', {'a': taka(st.paid)}),
-                                  style: const TextStyle(color: AppColors.income, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                                  style: TextStyle(color: readableOn(context, AppColors.income), fontSize: 12.5, fontWeight: FontWeight.w700)),
                             if (st.remaining > 0.5)
                               Text(tr('Due {a}', {'a': taka(st.remaining)}),
                                   style: const TextStyle(color: AppColors.expense, fontSize: 12.5, fontWeight: FontWeight.w700)),
@@ -349,7 +352,7 @@ class _PaymentsScreenState extends ConsumerState<PaymentsScreen> {
                             const SizedBox(height: 2),
                             Chip(
                               label: Text(feeStatusLabel(st.status),
-                                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                  style: TextStyle(color: onColor(color), fontSize: 12)),
                               backgroundColor: color, visualDensity: VisualDensity.compact),
                           ]),
                         ]),

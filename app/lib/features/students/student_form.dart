@@ -315,7 +315,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [c, Color.lerp(c, const Color(0xFF8B5CF6), 0.5)!]),
+                // deepened so the white name / pills stay readable on light colours
+                colors: [deepenForWhite(c), deepenForWhite(Color.lerp(c, const Color(0xFF8B5CF6), 0.5)!)]),
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(color: c.withValues(alpha: 0.28), blurRadius: 20, offset: const Offset(0, 8)),
@@ -969,7 +970,8 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           boxShadow: custom != null ? [BoxShadow(color: custom, blurRadius: 0, spreadRadius: 1)] : null,
         ),
         alignment: Alignment.center,
-        child: Icon(custom == null ? Icons.colorize : Icons.check, size: 18, color: Colors.white),
+        child: Icon(custom == null ? Icons.colorize : Icons.check, size: 18,
+            color: custom == null ? Colors.white : onColor(custom)),
       ),
     );
   }
@@ -989,7 +991,7 @@ class _StudentFormScreenState extends ConsumerState<StudentFormScreen> {
           boxShadow: sel ? [BoxShadow(color: color, blurRadius: 0, spreadRadius: 1)] : null,
         ),
         alignment: Alignment.center,
-        child: sel ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+        child: sel ? Icon(Icons.check, color: onColor(color), size: 18) : null,
       ),
     );
   }

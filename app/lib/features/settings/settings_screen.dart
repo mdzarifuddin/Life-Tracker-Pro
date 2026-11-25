@@ -10,7 +10,6 @@ import '../../core/providers.dart';
 import '../../core/updater.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
-import 'background_editor.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -159,34 +158,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // ---------------------------------------------------------------- appearance
 
   Widget _appearanceCard(BuildContext context) {
-    final mode = ref.watch(themeModeProvider);
     final look = ref.watch(appearanceProvider);
-    final b = Theme.of(context).brightness;
     final scale = _dragScale ?? look.textScale;
     final hint = Theme.of(context).hintColor;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _BackgroundPreview(gradient: look.background(b), scale: scale),
+          _label(context, tr('Background')),
+          // three fixed looks; each card is a small live preview of that background
+          Row(children: [
+            for (final o in bgOptions) ...[
+              if (o != bgOptions.first) const SizedBox(width: 10),
+              Expanded(child: _BgCard(
+                option: o,
+                selected: look.bg == o.id,
+                onTap: () => ref.read(appearanceProvider.notifier).set(look.copyWith(bg: o.id)),
+              )),
+            ],
+          ]),
           Gap.l,
-          _label(context, tr('Theme')),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<ThemeMode>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(value: ThemeMode.dark, label: Text(tr('Dark')), icon: const Icon(Icons.dark_mode_outlined, size: 18)),
-                ButtonSegment(value: ThemeMode.light, label: Text(tr('Light')), icon: const Icon(Icons.light_mode_outlined, size: 18)),
-                ButtonSegment(value: ThemeMode.system, label: Text(tr('System')), icon: const Icon(Icons.brightness_auto_outlined, size: 18)),
-              ],
-              selected: {mode},
-              onSelectionChanged: (v) => ref.read(themeModeProvider.notifier).set(v.first),
-            ),
-          ),
-          Gap.l,
-          _label(context, b == Brightness.dark ? tr('Dark mode backgrounds') : tr('Light mode backgrounds')),
-          _swatchGrid(context, look, b),
+          _BackgroundPreview(gradient: look.gradient, scale: scale),
           Gap.l,
           Row(children: [
             Expanded(child: _label(context, tr('Text size'))),
@@ -233,48 +225,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
       );
-
-  Widget _swatchGrid(BuildContext context, Appearance look, Brightness b) {
-    final selected = look.bgIdFor(b);
-    final custom = look.customFor(b);
-    final notifier = ref.read(appearanceProvider.notifier);
-    return LayoutBuilder(builder: (context, c) {
-      const cols = 4, gap = 10.0;
-      final w = (c.maxWidth - gap * (cols - 1)) / cols;
-      return Wrap(spacing: gap, runSpacing: 12, children: [
-        for (final p in presetsFor(b))
-          _Swatch(
-            width: w,
-            gradient: p.gradient,
-            label: tr(p.name),
-            selected: selected == p.id,
-            onTap: () => notifier.set(look.withBg(b, p.id)),
-          ),
-        _Swatch(
-          width: w,
-          gradient: custom?.gradient,
-          label: tr('Custom'),
-          selected: selected == customBgId,
-          badge: custom == null ? Icons.add : Icons.edit,
-          onTap: () {
-            if (custom != null && selected != customBgId) {
-              notifier.set(look.withBg(b, customBgId));
-            } else {
-              _editCustom(context, b);
-            }
-          },
-          onLongPress: () => _editCustom(context, b),
-        ),
-      ]);
-    });
-  }
-
-  Future<void> _editCustom(BuildContext context, Brightness b) async {
-    final look = ref.read(appearanceProvider);
-    final res = await showBackgroundEditor(context, b, look.customFor(b) ?? CustomBg.seed(b));
-    if (res == null) return;
-    ref.read(appearanceProvider.notifier).set(ref.read(appearanceProvider).withBg(b, customBgId, custom: res));
-  }
 
   // ------------------------------------------------------------------ language
 
@@ -347,6 +297,8 @@ class _BackgroundPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    // The title sits on the background itself (the selected one = the current theme).
+    final onBg = BgInk.of(context).text;
     final mq = MediaQuery.of(context);
     // The app-wide scale already applies; while dragging, preview the new one.
     final sys = mq.textScaler is AppTextScaler ? (mq.textScaler as AppTextScaler).system : mq.textScaler;
@@ -362,9 +314,9 @@ class _BackgroundPreview extends StatelessWidget {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(tr('Preview'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            Text(tr('Preview'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: onBg)),
             const Spacer(),
-            Icon(Icons.more_horiz, color: cs.onSurface),
+            Icon(Icons.more_horiz, color: onBg),
           ]),
           const SizedBox(height: 10),
           Container(
@@ -392,83 +344,74 @@ class _BackgroundPreview extends StatelessWidget {
   }
 }
 
-/// One tappable gradient swatch; [gradient] null draws an empty "create" tile.
-class _Swatch extends StatelessWidget {
-  const _Swatch({
-    required this.width,
-    required this.gradient,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.onLongPress,
-    this.badge,
-  });
-  final double width;
-  final Gradient? gradient;
-  final String label;
+/// One of the three backgrounds as a tappable mini preview: the gradient with a
+/// title in that background's own text colour and a small card in its theme.
+class _BgCard extends StatelessWidget {
+  const _BgCard({required this.option, required this.selected, required this.onTap});
+  final BgOption option;
   final bool selected;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final IconData? badge;
 
   @override
   Widget build(BuildContext context) {
+    final dark = option.isDark;
+    final ink = BgInk(dark: dark);
+    final surface = dark ? AppColors.dSurface : AppColors.lSurface;
+    final onSurface = dark ? AppColors.dOnBackground : AppColors.lOnBackground;
+    final muted = dark ? AppColors.dMuted : AppColors.lMuted;
     final cs = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: width,
-      child: Column(children: [
-        GestureDetector(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: width * 1.15,
-            decoration: BoxDecoration(
-              gradient: gradient,
-              color: gradient == null ? cs.surfaceContainer : null,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selected ? AppColors.primary : cs.outline,
-                width: selected ? 3 : 1,
-              ),
-              boxShadow: selected
-                  ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.35), blurRadius: 10)]
-                  : null,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: tr(option.name),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          decoration: BoxDecoration(
+            gradient: option.gradient,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? AppColors.primary : cs.outline,
+              width: selected ? 3 : 1,
             ),
-            child: Stack(children: [
-              if (gradient == null)
-                Center(child: Icon(Icons.add, color: cs.onSurfaceVariant, size: 28)),
+            boxShadow: selected
+                ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.35), blurRadius: 10)]
+                : null,
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(tr(option.name), maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: ink.text, fontWeight: FontWeight.w800, fontSize: 14))),
               if (selected)
-                Positioned(
-                  top: 6, right: 6,
-                  child: Container(
-                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                    padding: const EdgeInsets.all(2),
-                    child: const Icon(Icons.check, color: Colors.white, size: 16),
-                  ),
-                ),
-              if (badge != null && gradient != null)
-                Positioned(
-                  bottom: 6, right: 6,
-                  child: Container(
-                    decoration: BoxDecoration(color: cs.surface.withValues(alpha: 0.85), shape: BoxShape.circle),
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(badge, color: cs.onSurface, size: 14),
-                  ),
+                Container(
+                  decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  padding: const EdgeInsets.all(2),
+                  child: const Icon(Icons.check, color: Colors.white, size: 14),
                 ),
             ]),
-          ),
+            Text(tr(dark ? 'Dark' : 'Light'),
+                style: TextStyle(color: ink.muted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Aa', style: TextStyle(color: onSurface, fontWeight: FontWeight.w800, fontSize: 13)),
+                Text('৳ 27,000', maxLines: 1,
+                    style: TextStyle(color: muted, fontSize: 10.5)),
+              ]),
+            ),
+            const SizedBox(height: 6),
+            Text(tr('See all'), style: TextStyle(color: ink.link, fontSize: 11, fontWeight: FontWeight.w700)),
+          ]),
         ),
-        const SizedBox(height: 5),
-        Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? cs.onSurface : cs.onSurfaceVariant,
-            )),
-      ]),
+      ),
     );
   }
 }

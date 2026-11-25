@@ -45,7 +45,7 @@ class AccountsScreen extends ConsumerWidget {
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _Mf.red),
+              style: FilledButton.styleFrom(backgroundColor: _Mf.redFill),
               onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
         ],
       ),
@@ -72,12 +72,12 @@ class AccountsScreen extends ConsumerWidget {
           child: Padding(
             padding: EdgeInsets.only(bottom: 6),
             child: Text('Tap an account to open its expense tracker',
-                style: TextStyle(color: Colors.white70, fontSize: 12)),
+                style: TextStyle(color: Color(0xE6FFFFFF), fontSize: 12)),
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _Mf.green,
+        backgroundColor: _Mf.greenFill,
         foregroundColor: Colors.white,
         onPressed: () => _edit(context, ref),
         icon: const Icon(Icons.add),
@@ -247,7 +247,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: _Mf.green),
+          style: FilledButton.styleFrom(backgroundColor: _Mf.greenFill),
           onPressed: () {
             final n = _name.text.trim();
             if (n.isEmpty) return;

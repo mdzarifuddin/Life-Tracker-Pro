@@ -88,19 +88,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       appBar: AppBar(
         title: Text(tr('Tuition')),
         actions: [
-          TextButton.icon(
-              onPressed: () => context.push('/students/payments'),
-              icon: const Icon(Icons.payments_outlined, size: 18),
-              label: Text(tr('Pay'))),
-          TextButton.icon(
-              onPressed: () => context.push('/students/history'),
-              icon: const Icon(Icons.history, size: 18),
-              label: Text(tr('History'))),
-          TextButton.icon(
-              onPressed: () => context.push('/students/exams'),
-              icon: const Icon(Icons.event_note, size: 18),
-              label: Text(tr('Exams'))),
-          const SizedBox(width: 4),
+          _BarAction(Icons.payments_outlined, tr('Pay'), () => context.push('/students/payments')),
+          _BarAction(Icons.history, tr('History'), () => context.push('/students/history')),
+          _BarAction(Icons.event_note, tr('Exams'), () => context.push('/students/exams')),
+          const SizedBox(width: 6),
         ],
       ),
       body: SafeArea(
@@ -535,6 +526,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
     final hint = Theme.of(context).hintColor;
     final paid = l.isPaid;
     final accent = paid ? paidClassColor : AppColors.warning;
+    final accentText = readableOn(context, accent);
+    final link = Theme.of(context).brightness == Brightness.dark ? AppColors.linkDark : AppColors.linkLight;
     final d = l.date;
     Widget line(String k, String v, Color c) => Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -557,9 +550,9 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           ),
           child: Column(children: [
             Text(weekdayNames[d.weekday - 1].toUpperCase(),
-                style: TextStyle(color: accent, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            Text('${d.day}', style: TextStyle(color: accent, fontSize: 21, fontWeight: FontWeight.w800, height: 1.15)),
-            Text(_mon[d.month - 1], style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w600)),
+                style: TextStyle(color: accentText, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            Text('${d.day}', style: TextStyle(color: accentText, fontSize: 21, fontWeight: FontWeight.w800, height: 1.15)),
+            Text(_mon[d.month - 1], style: TextStyle(color: accentText, fontSize: 11, fontWeight: FontWeight.w600)),
           ]),
         ),
         Gap.m,
@@ -578,10 +571,10 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             const SizedBox(width: 4),
             Text(TimeOfDay.fromDateTime(d).format(context), style: TextStyle(color: hint, fontSize: 12.5)),
             const SizedBox(width: 10),
-            const Icon(Icons.star_rounded, size: 15, color: Color(0xFFC3C6FF)),
+            Icon(Icons.star_rounded, size: 15, color: link),
             const SizedBox(width: 2),
-            Text('${l.performance}/10', style: const TextStyle(
-                color: Color(0xFFC3C6FF), fontWeight: FontWeight.w700, fontSize: 12.5)),
+            Text('${l.performance}/10', style: TextStyle(
+                color: link, fontWeight: FontWeight.w700, fontSize: 12.5)),
             const Spacer(),
             Icon(Icons.edit_outlined, size: 15, color: hint),
           ]),
@@ -861,6 +854,12 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
           _scheduledFor(context, ref, repo, s),
           Gap.l,
+          SectionTitle('Busy times', icon: Icons.block, color: AppColors.expense,
+              trailing: TextButton.icon(
+                  onPressed: () => showBusySheet(context, repo, id),
+                  icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
+          BusyTimesList(repo: repo, studentId: id),
+          Gap.l,
           SectionTitle('Exams', icon: Icons.event, color: AppColors.warning,
               trailing: TextButton.icon(
                   onPressed: () => showExamSheet(context, studentId: id),
@@ -911,7 +910,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text('Tap a day to add/edit · ‹ › changes the month (logs follow)',
-                style: TextStyle(color: hint, fontSize: 12)),
+                style: TextStyle(color: BgInk.of(context).muted, fontSize: 12)),
           ),
           Gap.l,
           SectionTitle('Class logs · ${monthLogs.length}', icon: Icons.menu_book, color: AppColors.primary,
@@ -926,7 +925,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Text('Tap to edit · swipe right to mark paid / unpaid',
-                  style: TextStyle(color: hint, fontSize: 12)),
+                  style: TextStyle(color: BgInk.of(context).muted, fontSize: 12)),
             ),
             for (final l in monthLogs)
               Padding(padding: const EdgeInsets.only(bottom: 10), child: _logCard(repo, s, l)),
@@ -940,7 +939,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           Row(children: [
             Expanded(child: FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: paidClassColor,
-                  minimumSize: const Size.fromHeight(48)),
+                  foregroundColor: onColor(paidClassColor), minimumSize: const Size.fromHeight(48)),
               onPressed: () => showMarkPaidSheet(context, repo, s),
               icon: const Icon(Icons.price_check),
               label: const Text('Mark classes paid'))),
@@ -998,7 +997,7 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text('Tuition payments stay in student records only (not in Finance).',
-                style: TextStyle(color: hint, fontSize: 12)),
+                style: TextStyle(color: BgInk.of(context).muted, fontSize: 12)),
           ),
         ];
 
@@ -1058,12 +1057,6 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
                   icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                   label: const Text('Add'))),
           _routinesFor(context, repo, id),
-          Gap.l,
-          SectionTitle('Busy times', icon: Icons.block, color: AppColors.warning,
-              trailing: TextButton.icon(
-                  onPressed: () => showBusySheet(context, repo, id),
-                  icon: const Icon(Icons.add, size: 18), label: const Text('Add'))),
-          BusyTimesList(repo: repo, studentId: id),
         ];
 
         // ---------- at-a-glance tiles ----------
@@ -1124,6 +1117,8 @@ class _StudentDetailScreenState extends ConsumerState<StudentDetailScreen> {
               SliverAppBar(
                 pinned: true,
                 backgroundColor: Theme.of(context).colorScheme.surface,
+                // solid surface bar: use surface text, not the background-based app-bar colour
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
                 surfaceTintColor: Colors.transparent,
                 title: AnimatedOpacity(
                   opacity: _showTitle ? 1 : 0,
@@ -1319,7 +1314,9 @@ class _TaughtCalendar extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Text('${date.day}', style: TextStyle(
-            color: (taught || absent) ? Colors.white : null,
+            color: taught
+                ? onColor(paidKeys.contains(key) ? paidClassColor : AppColors.income)
+                : (absent ? onColor(AppColors.expense) : null),
             fontWeight: taught ? FontWeight.bold : FontWeight.normal,
             fontSize: 13,
           )),
@@ -1455,4 +1452,28 @@ String _studyingFor(Student s, List<ClassLog> logs) {
   final rest = b.difference(DateTime(a.year, a.month + months, a.day)).inDays;
   final span = months > 0 ? '$months mo $rest d' : '$days d';
   return '${s.isCurrent ? 'Studying' : 'Studied'} $span ($days days)';
+}
+
+/// Small icon with its label underneath, for the Tuition app bar (Pay / History / Exams).
+class _BarAction extends StatelessWidget {
+  const _BarAction(this.icon, this.label, this.onTap);
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final c = readableOnBg(context, Theme.of(context).colorScheme.primary); // on the app background
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, size: 19, color: c),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: c)),
+        ]),
+      ),
+    );
+  }
 }

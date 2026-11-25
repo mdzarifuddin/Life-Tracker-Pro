@@ -46,14 +46,17 @@ class _Section extends StatelessWidget {
   final String? badge;
   final VoidCallback? onAll;
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    // Drawn straight on the app background.
+    final ink = BgInk.of(context);
+    return Padding(
         padding: const EdgeInsets.fromLTRB(2, 20, 0, 8),
         child: Row(children: [
-          IconBadge(icon: icon, color: color, size: 28),
+          IconBadge(icon: icon, color: color, size: 28, onBackground: true),
           const SizedBox(width: 10),
           Expanded(child: Row(children: [
             Flexible(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700))),
+                style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: ink.text))),
             if (badge != null) ...[
               const SizedBox(width: 8),
               Container(
@@ -62,7 +65,7 @@ class _Section extends StatelessWidget {
                   color: color.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text(badge!, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                child: Text(badge!, style: TextStyle(color: readableOnBg(context, color), fontSize: 11.5, fontWeight: FontWeight.w700)),
               ),
             ],
           ])),
@@ -71,6 +74,7 @@ class _Section extends StatelessWidget {
             TextButton(
               onPressed: onAll,
               style: TextButton.styleFrom(
+                foregroundColor: ink.link,
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
@@ -81,6 +85,7 @@ class _Section extends StatelessWidget {
             ),
         ]),
       );
+  }
 }
 
 /// Small at-a-glance chip under the greeting (value + label).
@@ -244,21 +249,22 @@ class DashboardScreen extends ConsumerWidget {
   /// Compact top: greeting, app name, date, update chip + menu. No hero card.
   Widget _header(BuildContext context, DateTime now) {
     final cs = Theme.of(context).colorScheme;
+    final ink = BgInk.of(context); // the header sits on the app background
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(_greeting(now),
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant, letterSpacing: 0.2)),
+                color: ink.muted, letterSpacing: 0.2)),
         const SizedBox(height: 2),
         Text('Life Tracker Pro',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, height: 1.15,
-                color: cs.onSurface, letterSpacing: -0.3)),
+                color: ink.text, letterSpacing: -0.3)),
         const SizedBox(height: 4),
         Row(children: [
-          Icon(Icons.today, size: 14, color: cs.onSurfaceVariant),
+          Icon(Icons.today, size: 14, color: ink.muted),
           const SizedBox(width: 5),
           Text('${DateFormat('EEEE').format(now)}, ${fullDate(now)}',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: ink.muted)),
         ]),
         ValueListenableBuilder<VersionStatus>(
           valueListenable: versionStatus,

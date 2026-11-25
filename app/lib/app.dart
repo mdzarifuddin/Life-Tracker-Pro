@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -111,7 +112,7 @@ class LifeTrackerApp extends ConsumerWidget {
   const LifeTrackerApp({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(themeModeProvider);
+    // The chosen background fixes the theme (Pastel = light, Aurora / Midnight = dark).
     final look = ref.watch(appearanceProvider);
     ref.watch(langProvider); // rebuild the app when the language changes
     return MaterialApp.router(
@@ -119,15 +120,19 @@ class LifeTrackerApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: mode,
+      themeMode: look.themeMode,
       routerConfig: _router,
       builder: (context, child) {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: AppTextScaler(mq.textScaler, look.textScale)),
-          child: DecoratedBox(
-            decoration: BoxDecoration(gradient: look.background(Theme.of(context).brightness)),
-            child: child ?? const SizedBox.shrink(),
+          // Status-bar icons follow the background (app bars set the same style).
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: BgInk.of(context).overlay,
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: look.gradient),
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
